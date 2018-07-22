@@ -8,16 +8,32 @@ import pandas as pd
 import pendulum, time, pickle, os
 from user_interface import UserInterface
 
-VERSION = ".2"
+VERSION = ".5"
 
+def clear():
+    """
+    Global function that clears the command line
+    """
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 # TODO: rename src to pysheet or wtathevalj
 
 class TimesheetManager:  # TODO: load other timesheets and save state between them (i.e. default timesheet, etc)
-    def __init__(self, name, init_tasks=None, path=os.getcwd()):
+    def __init__(self, name=None, path=os.getcwd()):
         self.__version__ = VERSION
         self.path = os.path.join(path, "timesheets")
         os.makedirs(self.path, exist_ok=True)
+        if name is None:
+            try:
+                default = self.load_config()
+                name = default
+            except FileNotFoundError:
+                clear()
+                print("[SETUP] There is no default Timesheet set.  A temporary Timesheet will be created.")
+                print("\nIf you have not yet created a timesheet, or need to set your default timesheet,")
+                print("please do so in the 'Timesheet Management' menu.")
+                _ = input("\nPress ENTER to continue...")
+            name = "TEMPORARY"
         self.name = name
         self.today = pendulum.today()
         new = False
@@ -25,13 +41,9 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
             self.data = self.load_timesheet(self.name)
         except FileNotFoundError:
             new = True
-            if init_tasks:
-                self.tasks = init_tasks
-            else:
-                self.tasks = None
+            self.tasks = None
             self.data = pd.DataFrame(index=self.tasks)
         self.UI = UserInterface(name, new, self.today, VERSION)
-        # self.start_time = 0
 
         while True:
             code, string = self.UI.ask_generic_input()
@@ -58,12 +70,28 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
                 self.UI.user_return()
             elif code == '44':
                 self.delete_timesheet(string)
-            elif code=='45':
+            elif code == '45':
                 self.backup_timesheet(string)
+            elif code == '46':
+                self.save_config(string)
 
             self.UI.banner()  # places banner at top of each new page
 
     ################ File Management Functions ################
+
+    def save_config(self, default):
+        self.UI.banner()
+        config = open("config.data", "w")
+        config.write("default_timesheet={}".format(default))
+        config.close()
+        print("{} set as default Timesheet.".format(default))
+        self.UI.user_return()
+
+    def load_config(self):
+        config = open("config.data", "r")
+        default = config.read()
+        default = default.split(':')
+        return default[1]
 
     def save_timesheet(self, path, name, data):
         path = os.path.join(path, "{}.pkl".format(name))
@@ -85,14 +113,14 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
         while decision not in ["y", "n"]:
             decision = input("[WARNING] Confirm DELETION of Timesheet '{}' [y/n]: ".format(name)).lower()
         if decision == "y":
-            os.remove(os.path.join(self.path, name+".pkl"))
+            os.remove(os.path.join(self.path, name + ".pkl"))
             print("'{}' deleted.".format(name))
             self.UI.user_return()
         else:
             print("'{}' not deleted.".format(name))
             self.UI.user_return()
 
-    def list_timesheets(self): #TODO: remove backup from list
+    def list_timesheets(self):  # TODO: remove backup from list
         """
         Lists Timesheets saved
         """
@@ -129,8 +157,6 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
             self.data = pd.DataFrame(index=self.tasks)
             self.UI = UserInterface(name, new, self.today, VERSION)
             self.start_time = 0
-
-
 
     ################ Logging Functions ################
 
@@ -220,9 +246,9 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
 
 
 if __name__ == "__main__":
-    # t = Timesheet("nodata")
+    t = TimesheetManager()
     #
-    tt = TimesheetManager("data", ["Tea", "Kristin"])
+    # tt = TimesheetManager("data", ["Tea", "Kristin"])
     #
     # t.add_task("TEST1")
     #
@@ -234,7 +260,7 @@ if __name__ == "__main__":
     # t.start_task("TEST1")
     # tt.start_task("TEST2")
 
-    print("\n\n\n")
+    # print("\n\n\n")
 
     # ui = UserInterface("test", False, pendulum.today())
     # ui.ask_generic_input()

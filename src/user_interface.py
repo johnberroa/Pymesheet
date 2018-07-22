@@ -75,8 +75,9 @@ class UserInterface:
             print("3) Load a Timesheet:\n  -Load a Timesheet with a given name.")
             print("4) Delete a Timesheet:\n  -Delete a Timesheet with a given name.")
             print("5) Backup a Timesheet:\n  -Backup a Timesheet in another location (backups folder).")
-            print("6) Help:\n  -Print this page.")
-            print("7) Return:\n  -Return to the main menu.")
+            print("6) Set default Timesheet:\n  -Set the Timesheet to open on a fresh start of the program.")
+            print("7) Help:\n  -Print this page.")
+            print("8) Return:\n  -Return to the main menu.")
             self.user_return()
         elif which == "task":
             print("Here you can create, delete, or list the tasks within the '{}' Timesheet.\n".format(self.name))
@@ -99,8 +100,9 @@ class UserInterface:
         print("\t[3] Load a Timesheet...")
         print("\t[4] Delete a Timesheet...")
         print("\t[5] Backup a Timesheet...")
-        print("\t[6] Help")
-        print("\t[7] Return")
+        print("\t[6] Set default Timesheet...")
+        print("\t[7] Help")
+        print("\t[8] Return")
         selection = None
         while selection not in ["1", "2", "3", "4", "5", "6", "7"]:
             selection = input("\t...")
@@ -118,10 +120,13 @@ class UserInterface:
             elif selection == '5':  # Backup a sheet
                 sheet = self._ask_what_string(backup=True)
                 return selection, sheet
-            elif selection == '6':  # Help
+            elif selection == '6':  # Default
+                sheet = self._ask_what_string(default=True)
+                return selection, sheet
+            elif selection == '7':  # Help
                 self._help("timesheet")
                 return selection, None
-            elif selection == '7':  # Return
+            elif selection == '8':  # Return
                 return selection, None
 
     def ask_task_management_input(self):  # TODO: ask for multiple tasks like do you want to add another
@@ -200,7 +205,7 @@ class UserInterface:
         _ = input("\nPress ENTER to return...")
 
     def _ask_what_string(self, work=False, add=False, delete=False, load=False, remove=False, backup=False,
-                         create=False):
+                         create=False, default=False):
         """
         Asks for a task/sheet, and the prompt depends on the context.
         :param work: context for string output (task)
@@ -213,19 +218,21 @@ class UserInterface:
         """
         self.banner()
         if work:
-            string = input("\nLog work for which Task?\n\t...")  # TODO: Do all lines start with \n?
+            string = input("Log work for which Task?\n\t...")  # TODO: Do all lines start with \n?
         elif add:
-            string = input("\nAdd which Task?\n\t...")
+            string = input("Add which Task?\n\t...")
         elif delete:
-            string = input("\nDelete which Task?\n\t...")
+            string = input("Delete which Task?\n\t...")
         elif load:
-            string = input("\nLoad which Timesheet?\n\t...")
+            string = input("Load which Timesheet?\n\t...")
         elif remove:
-            string = input("\nDelete which Timesheet?\n\t...")
+            string = input("Delete which Timesheet?\n\t...")
         elif backup:
-            string = input("\nBackup which Timesheet?\n\t...")
+            string = input("Backup which Timesheet?\n\t...")
         elif create:
-            string = input("\nWhat will the new Timesheet be called?\n\t...")
+            string = input("What will the new Timesheet be called?\n\t...")
+        elif default:
+            string = input("What Timesheet will be the default?\n\t...")
         return string
 
     ################ Specific Functions ################
