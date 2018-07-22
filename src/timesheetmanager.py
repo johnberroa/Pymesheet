@@ -33,7 +33,7 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
                 print("\nIf you have not yet created a timesheet, or need to set your default timesheet,")
                 print("please do so in the 'Timesheet Management' menu.")
                 _ = input("\nPress ENTER to continue...")
-            name = "TEMPORARY"
+                name = "TEMPORARY"
         self.name = name
         self.today = pendulum.today()
         new = False
@@ -80,6 +80,10 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
     ################ File Management Functions ################
 
     def save_config(self, default):
+        """
+        Saves default timesheet in a text file for later usage.
+        :param default: name of timesheet to set as default
+        """
         self.UI.banner()
         config = open("config.data", "w")
         config.write("default_timesheet={}".format(default))
@@ -90,7 +94,9 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
     def load_config(self):
         config = open("config.data", "r")
         default = config.read()
-        default = default.split(':')
+        default = default.split('=')
+        print(default)
+        time.sleep(5)
         return default[1]
 
     def save_timesheet(self, path, name, data):
@@ -98,6 +104,10 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
         pickle.dump(data, open(path, "wb"))
 
     def load_timesheet(self, name):
+        """
+        Loads a timesheet and sets all the parameters of this class to deal with the new timesheet
+        :param name: name of Timesheet
+        """
         path = os.path.join(self.path, "{}.pkl".format(name))
         self.name = name
         self.UI = UserInterface(name, False, self.today, VERSION)
