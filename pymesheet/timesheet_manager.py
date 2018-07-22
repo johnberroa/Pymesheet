@@ -9,7 +9,7 @@ import pendulum, time, pickle, os
 from user_interface import UserInterface
 from time_utils import Converter
 
-VERSION = ".7"
+VERSION = ".8"
 
 
 def clear():
