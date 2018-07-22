@@ -26,10 +26,11 @@ class TimesheetManager:
         self.__version__ = VERSION
         self.path = os.path.join(path, "timesheets")
         os.makedirs(self.path, exist_ok=True)
+        self.tz = "Europe/Berlin"
         if name is None:
             try:
                 default = self.load_config()
-                name = default
+                name = default  # TODO: SET SAVING OF TZ IN CONFIG
             except FileNotFoundError:
                 clear()
                 print("[SETUP] There is no default Timesheet set.  A temporary Timesheet will be created.")
@@ -38,7 +39,7 @@ class TimesheetManager:
                 _ = input("\nPress ENTER to continue...")
                 name = "TEMPORARY"
         self.name = name
-        self.today = pendulum.today()
+        self.today = pendulum.today(tz=self.tz)
         new = False
         try:
             self.data = self.load_timesheet(self.name)
@@ -53,8 +54,14 @@ class TimesheetManager:
 
             if code == '1':
                 self.start_task(string)
+            elif code == '21':
+                self.time_per_task(string)
             elif code == '22':
                 self.time_per_day(string)
+            elif code == '23':
+                self.time_per_taskday(*string)
+            elif code == '24':
+                self.total_time()
             elif code == '31':
                 self.list_tasks()
             elif code == '33':
@@ -192,14 +199,14 @@ class TimesheetManager:
         if task_name not in self.data.index:
             self.UI.banner()
             add = input(
-                "[WARNING] '{}' is not in the list of tasks...would you like to add it? [y/n]...".format(task_name))
+                "[WARNING] '{}' is not in the list of Tasks...would you like to add it? [y/n]...".format(task_name))
             if add.lower() == 'y':
                 self.add_task(task_name)
                 go_on = True
             elif add.lower() == 'n':
                 go_on = False
             else:
-                print("[WARNING] Invalid input...not creating new task and returning to the main menu...")
+                print("[WARNING] Invalid input...not creating new Task and returning to the main menu...")
                 go_on = False
                 self.UI.user_return()
         if go_on:
@@ -217,9 +224,10 @@ class TimesheetManager:
         :param name: task to record
         """
         self.UI.banner()
-        self.data[self.today.to_date_string()].loc[name] += int(time.time() - start_time)  # do not care about ms
+        # Is setting a copy warning
+        # self.data[self.today.to_date_string()].loc[name] += int(time.time() - start_time)  # do not care about ms
+        self.data.at[name, self.today.to_date_string()] += int(time.time() - start_time)  # do not care about ms
         print("Logging of Task '{}' stopped...".format(name))
-        print(self.data.head(20))
         self.save_timesheet(self.path, self.name, self.data)
         print("Time successfully recorded!")
         self.UI.user_return()
@@ -270,27 +278,94 @@ class TimesheetManager:
     ################ Time Functions ################
 
     def time_per_day(self, day):
+        self.UI.banner()
         if day == "today":
             day = self.today.to_date_string()
         elif day == "yesterday":
-            day = pendulum.yesterday().to_date_string()
-        time = self.data[day].sum()
+            day = pendulum.yesterday(tz=self.tz).to_date_string()
+        if day not in self.data.columns:
+            print("There is no data for the selected date ({}).".format(day))
+        else:
+            time = self.data[day].sum()
+            print("t", time)
+            mins = Converter.sec2min(time)
+            hours, mins = Converter.min2hour(mins)
+            hour_min_string = Converter.convert2string(int(hours), int(mins))
+            days, hours_day = Converter.hour2day(hours)
+            day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
+            print("Summary for {}:".format(day))  # TODO: Make prettier
+            self.UI.summary_divider()
+            print(hour_min_string)
+            print(day_hour_min_string)
+            print("PLACEHOLDER time till 40")
+            print("dbug", self.data)
+        self.UI.user_return()
+
+    def time_per_task(self, task):
+        self.UI.banner()
+        if task not in self.data.index:
+            print("There is no Task named {}.".format(task))
+        else:
+            time = self.data.loc[task].sum()
+            print(time)
+            print("[TODO] NEEDS TO BE DOUBLE CHECKED WITH MULTIPLE COLUMNS")
+            mins = Converter.sec2min(time)
+            hours, mins = Converter.min2hour(mins)
+            hour_min_string = Converter.convert2string(int(hours), int(mins))
+            days, hours_day = Converter.hour2day(hours)
+            day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
+            print("Summary for {}:".format(task))  # TODO: Make prettier
+            self.UI.summary_divider()
+            print(hour_min_string)
+            print(day_hour_min_string)
+            print("dbug", self.data)
+        self.UI.user_return()
+
+    def time_per_taskday(self, task, day):
+        self.UI.banner()
+        skip = False
+        if day == "today":
+            day = self.today.to_date_string()
+        elif day == "yesterday":
+            day = pendulum.yesterday(tz=self.tz).to_date_string()
+        if task not in self.data.index:
+            print("There is no Task named {}.".format(task))
+            skip = True
+        if day not in self.data.columns:
+            print("There is no data for the selected date ({}).".format(day))
+            skip = True
+        if not skip:
+            time = self.data[day].loc[task]
+            print(time)
+            mins = Converter.sec2min(time)
+            hours, mins = Converter.min2hour(mins)
+            hour_min_string = Converter.convert2string(int(hours), int(mins))
+            days, hours_day = Converter.hour2day(hours)
+            day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
+            print("Summary for {} on {}:".format(task, day))  # TODO: Make prettier
+            self.UI.summary_divider()
+            print(hour_min_string)
+            print(day_hour_min_string)
+            print("dbug", self.data)
+        self.UI.user_return()
+
+    def total_time(self):
+        self.UI.banner()
+        time = self.data.values.sum()
         print(time)
         mins = Converter.sec2min(time)
-        print(mins)
         hours, mins = Converter.min2hour(mins)
-        print(hours, mins)
-        hour_min_string = Converter.convert2string(hours, mins)
-        print(hour_min_string)
+        hour_min_string = Converter.convert2string(int(hours), int(mins))
         days, hours_day = Converter.hour2day(hours)
-        print(days, hours_day)
-        day_hour_min_string = Converter.convert2string_days(days, hours_day, mins)
-        self.UI.banner()
-        print("Summary for {}".format(day)) #TODO: Make prettier
+        day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
+        print("Summary of all time worked:")  # TODO: Make prettier
         self.UI.summary_divider()
         print(hour_min_string)
         print(day_hour_min_string)
+        print("dbug", self.data)
         self.UI.user_return()
+
+
 
 if __name__ == "__main__":
     t = TimesheetManager()

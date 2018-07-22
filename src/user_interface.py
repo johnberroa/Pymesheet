@@ -135,44 +135,59 @@ class UserInterface:
             print("5) Return:\n  -Return to the main menu.")
             self.user_return()
         elif which == "summary":
-            raise NotImplementedError
+            print("Here you can see various summaries aggregated over time, task, or totals within the"
+                  " '{}' Timesheet.\n".format(self.name))
+            print("1) Time per Task:\n  -See how much time was worked in total for a specific Task.")
+            print("2) Time per day:\n  -See how much time was worked on a specific day.")
+            print("3) Time per Task per day:\n  -See how much time was worked for a specific task on a certain day.")
+            print("4) Total time:\n  -Display the total amount of time worked.")
+            print("5) Paid/actual time:\n  -Show any discrepancy between scheduled hours and actual hours.")
+            print("6) Help:\n  -Print this page.")
+            print("7) Return:\n  -Return to the main menu.")
+            self.user_return()
 
     def ask_time_summaries_input(self):
         """
         Page for time summaries.
         :return: selection and sheet to fulfill requirements by TimesheetManager for a return
-        """# TODO: OVertime section, daily, total, per task
+        """
         self.banner()
         print("Please select desired summary:\n")
         print("\t[1] Time per Task...")
         print("\t[2] Time per day...")
         print("\t[3] Time per Task per day...")
-        print("\t[4] Total Time")
-        print("\t[5] Paid/Actual Time")
+        print("\t[4] Total time")
+        print("\t[5] Paid/actual time")
         print("\t[6] Help")
         print("\t[7] Return")
         selection = None
         while selection not in ["1", "2", "3", "4", "5", "6", "7"]:
             selection = input("\t...")
             if selection == "1":  # time per task
-                return selection, None
+                task = self._ask_what_string(summary=True)
+                return selection, task
             elif selection == "2":  # time per day
                 day = self._ask_for_day()
                 return selection, day
             elif selection == "3":  # time per task per day
-                sheet = self._ask_what_string(load=True)
-                return selection, sheet
+                task = self._ask_what_string(summary=True)
+                day = self._ask_for_day()
+                return selection, (task, day)
             elif selection == '4':  # total time
-                sheet = self._ask_what_string(remove=True)
-                return selection, sheet
+                return selection, None
             elif selection == '5':  # paid/actual
-                sheet = self._ask_what_string(backup=True)
-                return selection, sheet
-            # elif selection == '6':  # help
-            #     self._help("summary")
-            #     return selection, None
-            # elif selection == '7':  # Help
-            #     return selection, None
+                print("Need to save in config number of part time full time?")
+                # Example code:
+                # part_time_weeks = 8
+                # paid_hours = (part_time_weeks * 20) + ((weeks_worked - part_time_weeks) * 40)
+                # paid_days, paid_excess_hours = Convert.hour2day(paid_hours)
+                # paid_parsed = Converter.convert2string(paid_hours, 0)
+                return selection, None
+            elif selection == '6':  # help
+                self._help("summary")
+                return selection, None
+            elif selection == '7':  # return
+                return selection, None
 
 
     def ask_timesheet_management_input(self):
@@ -254,7 +269,7 @@ class UserInterface:
         _ = input("\nPress ENTER to return...")
 
     def _ask_what_string(self, work=False, add=False, delete=False, load=False, remove=False, backup=False,
-                         create=False, default=False):
+                         create=False, default=False, summary=False):
         """
         Asks for a task/sheet, and the prompt depends on the context.
         :param work: context for string output (task)
@@ -282,6 +297,8 @@ class UserInterface:
             string = input("What will the new Timesheet be called?\n\t...")
         elif default:
             string = input("What Timesheet will be the default?\n\t...")
+        elif summary:
+            string = input("Which Task do you want to summarize?\n\t...")
         return string
 
     def _ask_for_day(self):
@@ -291,7 +308,7 @@ class UserInterface:
         valid = False
         while not re.match(DATE_REGEX, day) and valid == False:
             if day.lower() == "today" or day.lower() == "yesterday":
-                return day
+                return day.lower()
             else:
                 day = input("What day do you want to summarize?\n\tAvailable options:\n\t"
                       "1. YYYY-MM-DD\n\t"
@@ -299,6 +316,7 @@ class UserInterface:
                       "3. Yesterday\n\t...")
                 valid = self._check_date_validity(day)
         return day
+
 
     ################ Specific Functions ################
 
