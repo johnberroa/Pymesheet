@@ -7,8 +7,10 @@ Connects to a user interface for ease of use.
 import pandas as pd
 import pendulum, time, pickle, os
 from user_interface import UserInterface
+from time_utils import Converter
 
-VERSION = ".5"
+VERSION = ".7"
+
 
 def clear():
     """
@@ -16,9 +18,10 @@ def clear():
     """
     os.system('cls' if os.name == 'nt' else 'clear')
 
+
 # TODO: rename src to pysheet or wtathevalj
 
-class TimesheetManager:  # TODO: load other timesheets and save state between them (i.e. default timesheet, etc)
+class TimesheetManager:
     def __init__(self, name=None, path=os.getcwd()):
         self.__version__ = VERSION
         self.path = os.path.join(path, "timesheets")
@@ -50,8 +53,8 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
 
             if code == '1':
                 self.start_task(string)
-            elif code == '2':
-                self.start_task(string)
+            elif code == '22':
+                self.time_per_day(string)
             elif code == '31':
                 self.list_tasks()
             elif code == '33':
@@ -95,8 +98,6 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
         config = open("config.data", "r")
         default = config.read()
         default = default.split('=')
-        print(default)
-        time.sleep(5)
         return default[1]
 
     def save_timesheet(self, path, name, data):
@@ -123,6 +124,15 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
         while decision not in ["y", "n"]:
             decision = input("[WARNING] Confirm DELETION of Timesheet '{}' [y/n]: ".format(name)).lower()
         if decision == "y":
+            if name == self.name:
+                print("[WARNING] Deleting current Timesheet, new current Timesheet will be the default.")
+                _ = input("\nPress ENTER to continue...")
+                try:
+                    self.data = self.load_timesheet(self.load_config())
+                except FileNotFoundError:
+                    print("[WARNING] No default Timesheet set, creating a temporary...")
+                    _ = input("\nPress ENTER to acknowledge...")
+                    self.create_new_timesheet("TEMPORARY")
             os.remove(os.path.join(self.path, name + ".pkl"))
             print("'{}' deleted.".format(name))
             self.UI.user_return()
@@ -130,16 +140,18 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
             print("'{}' not deleted.".format(name))
             self.UI.user_return()
 
-    def list_timesheets(self):  # TODO: remove backup from list
+    def list_timesheets(self):
         """
         Lists Timesheets saved
         """
         self.UI.banner()
         print("List of Timesheets:")
-        for i, timesheet in enumerate(os.listdir(self.path)):
-            print("\t({}) {}".format(i + 1, timesheet))
-            print(self.data)  # TODO:DEBUG
-            self.UI.user_return()
+        i = 1
+        for timesheet in os.listdir(self.path):
+            if timesheet[-4:] == '.pkl':
+                print("\t({}) {}".format(i, timesheet))
+                i += 1
+        self.UI.user_return()
 
     def backup_timesheet(self, name):
         """
@@ -170,7 +182,7 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
 
     ################ Logging Functions ################
 
-    def start_task(self, task_name):  # TODO: list tasks and just input number of what you want
+    def start_task(self, task_name):
         """
         Starts the recording process.  Quietly calls _end_task when done, to record the time into the data.  Creates a
         new task if provided a task not already existing.
@@ -180,7 +192,7 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
         if task_name not in self.data.index:
             self.UI.banner()
             add = input(
-                "[WARNING] {} is not in the list of tasks...would you like to add it? [y/n]...".format(task_name))
+                "[WARNING] '{}' is not in the list of tasks...would you like to add it? [y/n]...".format(task_name))
             if add.lower() == 'y':
                 self.add_task(task_name)
                 go_on = True
@@ -195,7 +207,7 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
                 self.data[self.today.to_date_string()] = 0
             start_time = time.time()
             # Start the UI logging time, once stopped through the UI, record the time
-            self.UI.timelogger(task_name, start_time)
+            self.UI.timelogger(task_name)
             self._end_task(task_name, start_time)
 
     def _end_task(self, name, start_time):
@@ -204,9 +216,10 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
         for that task
         :param name: task to record
         """
+        self.UI.banner()
         self.data[self.today.to_date_string()].loc[name] += int(time.time() - start_time)  # do not care about ms
-        print("STOPPED")
-        print(self.data.head())
+        print("Logging of Task '{}' stopped...".format(name))
+        print(self.data.head(20))
         self.save_timesheet(self.path, self.name, self.data)
         print("Time successfully recorded!")
         self.UI.user_return()
@@ -221,7 +234,6 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
         print("List of Tasks in Timesheet {}:\n".format(self.name))
         for i, task in enumerate(self.data.index):
             print("\t({}) {}".format(i + 1, task))
-        print(self.data)  # TODO:DEBUG
         self.UI.user_return()
 
     def add_task(self, task_name):
@@ -231,15 +243,17 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
         :param task_name: name of task to add
         """
         if task_name in self.data.index:
-            print("Task {} already in Timesheet '{}'.".format(task_name, self.name))
+            print("\nTask {} already in Timesheet '{}'.".format(task_name, self.name))
             self.UI.user_return()
         else:
             if type(task_name) == str:
                 task_name = [task_name]
             new_task = pd.DataFrame(index=task_name)
-            self.data = self.data.append(new_task, verify_integrity=True)
-            print(self.data.head())
+            self.data = self.data.append(new_task, verify_integrity=True, sort=False)
+            print("Task '{}' created.".format(task_name[0]))
+            self.data.fillna(0, inplace=True)
             self.save_timesheet(self.path, self.name, self.data)
+            self.UI.user_return()
 
     def delete_task(self, task_name):
         """
@@ -247,30 +261,36 @@ class TimesheetManager:  # TODO: load other timesheets and save state between th
         :param task_name: task to delete
         """
         if task_name not in self.data.index:
-            print("'{}' task not in database.".format(task_name))
+            print("\n'{}' task not in database.".format(task_name))
             self.UI.user_return()
         else:
             self.data.drop(task_name, inplace=True)
-            print(self.data.head())
             self.save_timesheet(self.path, self.name, self.data)
 
+    ################ Time Functions ################
+
+    def time_per_day(self, day):
+        if day == "today":
+            day = self.today.to_date_string()
+        elif day == "yesterday":
+            day = pendulum.yesterday().to_date_string()
+        time = self.data[day].sum()
+        print(time)
+        mins = Converter.sec2min(time)
+        print(mins)
+        hours, mins = Converter.min2hour(mins)
+        print(hours, mins)
+        hour_min_string = Converter.convert2string(hours, mins)
+        print(hour_min_string)
+        days, hours_day = Converter.hour2day(hours)
+        print(days, hours_day)
+        day_hour_min_string = Converter.convert2string_days(days, hours_day, mins)
+        self.UI.banner()
+        print("Summary for {}".format(day)) #TODO: Make prettier
+        self.UI.summary_divider()
+        print(hour_min_string)
+        print(day_hour_min_string)
+        self.UI.user_return()
 
 if __name__ == "__main__":
     t = TimesheetManager()
-    #
-    # tt = TimesheetManager("data", ["Tea", "Kristin"])
-    #
-    # t.add_task("TEST1")
-    #
-    # tt.add_task(["TEST2"])
-    # tt.delete_task("Kristin")
-    #
-    # print("\n\n\n")
-    #
-    # t.start_task("TEST1")
-    # tt.start_task("TEST2")
-
-    # print("\n\n\n")
-
-    # ui = UserInterface("test", False, pendulum.today())
-    # ui.ask_generic_input()

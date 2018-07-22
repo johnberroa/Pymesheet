@@ -3,7 +3,7 @@ User interface for the Timesheet class
 Command line user interface for ease of use of logging time and other functions.
 @author: John Berroa
 """
-import time, os, sys
+import time, os, sys, re
 from pyfiglet import Figlet
 
 
@@ -33,11 +33,17 @@ class UserInterface:
         """
         print("=" * 80)
 
+    def summary_divider(self):
+        """
+        Prints a row of --- for a divider
+        """
+        print("-" * 40)
+
     def banner(self):
         """
         Prints the banner.  Calling this function clears the screen.
         """
-        clear()  # FOR DEBUGGING, COMMENT OUT
+        clear()  # FOR DEBUGGING, COMMENT IT OUT
         self._main_divider()
         f = Figlet(font='doom')
         print(f.renderText('Timesheet'))
@@ -45,6 +51,47 @@ class UserInterface:
                                                                    self.today.to_formatted_date_string()))
         print("Active Timesheet: '{}'\n".format(self.name))
         self._main_divider()
+
+
+    ################ Main Page ################
+
+    def ask_generic_input(self):
+        """
+        Main menu. This function talks to the timesheet class
+        :return: selection number (what function to use in timesheet), and task name if applicable
+        """
+        print("Please select desired function:\n")
+        print("\t[1] Start logging time for a Task...")
+        print("\t[2] Get time summaries...")
+        print("\t[3] Task management...")
+        print("\t[4] Timesheet management...")
+        print("\t[5] Help")
+        print("\t[6] Quit")
+        selection = None
+        while selection not in ["1", "2", "3", "4", "5", "6"]:
+            selection = input("\t...")
+            if selection == "1":  # Log time
+                task = self._ask_what_string(work=True)
+                return selection, task
+            elif selection == '2':  # Summary
+                second_selection, summary_request = self.ask_time_summaries_input()
+                selection = selection + second_selection
+                return selection, summary_request
+            elif selection == '3':  # Task management
+                second_selection, task = self.ask_task_management_input()
+                selection = selection + second_selection
+                return selection, task
+            elif selection == '4':  # Timesheet management
+                second_selection, sheet = self.ask_timesheet_management_input()
+                selection = selection + second_selection
+                return selection, sheet
+            elif selection == '5':  # Help
+                self._help("main")
+                return 0, '0'
+            elif selection == '6':  # Quit
+                self.banner()
+                print("Exiting...")
+                sys.exit()
 
     ################ Sub Pages ################
 
@@ -87,11 +134,51 @@ class UserInterface:
             print("4) Help:\n  -Print this usage page.")
             print("5) Return:\n  -Return to the main menu.")
             self.user_return()
+        elif which == "summary":
+            raise NotImplementedError
+
+    def ask_time_summaries_input(self):
+        """
+        Page for time summaries.
+        :return: selection and sheet to fulfill requirements by TimesheetManager for a return
+        """# TODO: OVertime section, daily, total, per task
+        self.banner()
+        print("Please select desired summary:\n")
+        print("\t[1] Time per Task...")
+        print("\t[2] Time per day...")
+        print("\t[3] Time per Task per day...")
+        print("\t[4] Total Time")
+        print("\t[5] Paid/Actual Time")
+        print("\t[6] Help")
+        print("\t[7] Return")
+        selection = None
+        while selection not in ["1", "2", "3", "4", "5", "6", "7"]:
+            selection = input("\t...")
+            if selection == "1":  # time per task
+                return selection, None
+            elif selection == "2":  # time per day
+                day = self._ask_for_day()
+                return selection, day
+            elif selection == "3":  # time per task per day
+                sheet = self._ask_what_string(load=True)
+                return selection, sheet
+            elif selection == '4':  # total time
+                sheet = self._ask_what_string(remove=True)
+                return selection, sheet
+            elif selection == '5':  # paid/actual
+                sheet = self._ask_what_string(backup=True)
+                return selection, sheet
+            # elif selection == '6':  # help
+            #     self._help("summary")
+            #     return selection, None
+            # elif selection == '7':  # Help
+            #     return selection, None
+
 
     def ask_timesheet_management_input(self):
         """
         Page for timesheet management.
-        :return: None and None to fulfill requirements by timesheet for a return #TODO: Is this correct?
+        :return: selection and sheet to fulfill requirements by TimesheetManager for a return
         """
         self.banner()
         print("Please select desired Timesheet management function:\n")
@@ -104,7 +191,7 @@ class UserInterface:
         print("\t[7] Help")
         print("\t[8] Return")
         selection = None
-        while selection not in ["1", "2", "3", "4", "5", "6", "7"]:
+        while selection not in ["1", "2", "3", "4", "5", "6", "7", "8"]:
             selection = input("\t...")
             if selection == "1":  # List timesheets
                 return selection, None
@@ -129,10 +216,10 @@ class UserInterface:
             elif selection == '8':  # Return
                 return selection, None
 
-    def ask_task_management_input(self):  # TODO: ask for multiple tasks like do you want to add another
+    def ask_task_management_input(self):
         """
         Page for task management.  Returns the task name for a function to be applied to.
-        :return: task name
+        :return: selection and task to fulfill requirements by TimesheetManager for a return
         """
         self.banner()
         print("Please select desired Task management function:\n")
@@ -158,47 +245,9 @@ class UserInterface:
             elif selection == '5':  # Return
                 return selection, None
 
-    ################ Main Page ################
-
-    def ask_generic_input(self):
-        """
-        Main menu. This function talks to the timesheet class
-        :return: selection number (what function to use in timesheet), and task name if applicable
-        """
-        print("Please select desired function:\n")
-        print("\t[1] Start logging time for a Task...")
-        print("\t[2] Get time summaries...")  # TODO: OVertime section, daily, total, per task DONT REFRESH?
-        print("\t[3] Task management...")
-        print("\t[4] Timesheet management...")
-        print("\t[5] Help")
-        print("\t[6] Quit")
-        selection = None
-        while selection not in ["1", "2", "3", "4", "5", "6"]:
-            selection = input("\t...")
-            if selection == "1":  # Log time
-                task = self._ask_what_string(work=True)
-                return selection, task
-            elif selection == '2':  # Summary
-                raise NotImplementedError
-            elif selection == '3':  # Task management
-                second_selection, task = self.ask_task_management_input()
-                selection = selection + second_selection
-                return selection, task
-            elif selection == '4':  # Timesheet management
-                second_selection, sheet = self.ask_timesheet_management_input()
-                selection = selection + second_selection
-                return selection, sheet
-            elif selection == '5':  # Help
-                self._help("main")
-                return 0, '0'
-            elif selection == '6':  # Quit
-                self.banner()
-                print("Exiting...")
-                sys.exit()
-
     ################ Specific User Inputs ################
 
-    def user_return(self):
+    def user_return(self): #TODO: Dependencies list
         """
         Tells the user to hit enter to return, but works for any key (doesn't matter what they press, just need a press)
         """
@@ -218,7 +267,7 @@ class UserInterface:
         """
         self.banner()
         if work:
-            string = input("Log work for which Task?\n\t...")  # TODO: Do all lines start with \n?
+            string = input("Log work for which Task?\n\t...")
         elif add:
             string = input("Add which Task?\n\t...")
         elif delete:
@@ -235,14 +284,40 @@ class UserInterface:
             string = input("What Timesheet will be the default?\n\t...")
         return string
 
+    def _ask_for_day(self):
+        DATE_REGEX = r"^\d{4}-\d{2}-\d{2}$"
+        self.banner()
+        day = ""
+        valid = False
+        while not re.match(DATE_REGEX, day) and valid == False:
+            if day.lower() == "today" or day.lower() == "yesterday":
+                return day
+            else:
+                day = input("What day do you want to summarize?\n\tAvailable options:\n\t"
+                      "1. YYYY-MM-DD\n\t"
+                      "2. Today\n\t"
+                      "3. Yesterday\n\t...")
+                valid = self._check_date_validity(day)
+        return day
+
     ################ Specific Functions ################
 
-    def timelogger(self, name, start_time):
+    def timelogger(self, name):
         """
         Page for starting the logging of time.
         :param name: name of task
-        :param start_time: start time in UNIX #TODO: Make it readable
         """
+        start_time = time.strftime("%H:%M:%S", time.gmtime()) # may lose a second on loading time between functions
         self.banner()
         print("Starting to log time on {} at {}".format(name, start_time))
         while input("\nPress ENTER to end logging...") != "": continue
+
+    def _check_date_validity(self, date):
+        """
+        Checks if the date is a valid date, i.e. the month isn't 77.
+        :param date: potential date string
+        :return: boolean
+        """
+        if len(date) == 10 and int(date[5:7]) <= 12 and int(date[-2:]) <= 31:
+            return True
+        return False
