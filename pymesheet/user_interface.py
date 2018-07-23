@@ -107,7 +107,7 @@ class UserInterface:
             print("Various summary functions allow you to analyze your time effortlessly.")
             print("When selecting Timesheets or Tasks, you have to type out their full names.")
             print("This is to prevent accidental deletions.")
-            print("\nIn the main menu, you can...")
+            print("\nAt the main menu, the following options are available:")
             print("1) Start logging time for a Task:\n  -Record time worked on a specific Task.")
             print("2) Get time summaries:\n  -Get statistics on data within the Timesheet.")
             print("3) Task management:\n  -Create, delete, and list Tasks within the Timesheet.")
@@ -116,7 +116,7 @@ class UserInterface:
             print("6) Quit:\n  -Exit the program.")
             self.user_return()
         elif which == "timesheet":
-            print("Here you can create, delete, load, list, or backup Timesheets.\n")
+            print("Here you can create, delete, load, list, or backup Timesheets:\n")
             print("1) List Timesheets:\n  -Returns a list of all saved Timesheets.")
             print("2) Create new Timesheet:\n  -Create a new Timesheet with a specific name.")
             print("3) Load a Timesheet:\n  -Load a Timesheet with a given name.")
@@ -127,7 +127,7 @@ class UserInterface:
             print("8) Return:\n  -Return to the main menu.")
             self.user_return()
         elif which == "task":
-            print("Here you can create, delete, or list the tasks within the '{}' Timesheet.\n".format(self.name))
+            print("Here you can create, delete, or list the tasks within the '{}' Timesheet:\n".format(self.name))
             print("1) List Tasks:\n  -Returns a list of all Tasks within the Timesheet file, enumerated.")
             print("2) Create new Task:\n  -Creates a new Task with the desired name if it does not already exist.")
             print("3) Delete a Task:\n  -Deletes a Task with the desired name.")
@@ -136,7 +136,7 @@ class UserInterface:
             self.user_return()
         elif which == "summary":
             print("Here you can see various summaries aggregated over time, task, or totals within the"
-                  " '{}' Timesheet.\n".format(self.name))
+                  " '{}' Timesheet:\n".format(self.name))
             print("1) Time per Task:\n  -See how much time was worked in total for a specific Task.")
             print("2) Time per day:\n  -See how much time was worked on a specific day.")
             print("3) Time per Task per day:\n  -See how much time was worked for a specific task on a certain day.")
