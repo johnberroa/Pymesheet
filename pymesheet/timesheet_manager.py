@@ -9,10 +9,9 @@ import pendulum, time, pickle, os
 from user_interface import UserInterface
 from time_utils import Converter
 
-VERSION = ".8"
+VERSION = ".9"
 
 
-# TODO:  make banner show when saying task is created
 # TODO: Start work day option?  := general/other += (end-start) - sum(all_today)
 
 def clear():
@@ -22,18 +21,16 @@ def clear():
     os.system('cls' if os.name == 'nt' else 'clear')
 
 
-# TODO: rename src to pysheet or wtathevalj
-
 class TimesheetManager:
     def __init__(self, name=None, path=os.getcwd()):
         self.__version__ = VERSION
         self.path = os.path.join(path, "timesheets")
         os.makedirs(self.path, exist_ok=True)
-        self.tz = "Europe/Berlin"
+        self.tz = "local"
         if name is None:
             try:
                 default = self.load_config()
-                name = default  # TODO: SET SAVING OF TZ IN CONFIG
+                name = default
             except FileNotFoundError:
                 clear()
                 print("[SETUP] There is no default Timesheet set.  A temporary Timesheet will be created.")

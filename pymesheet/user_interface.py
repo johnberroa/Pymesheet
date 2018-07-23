@@ -52,7 +52,6 @@ class UserInterface:
         print("Active Timesheet: '{}'\n".format(self.name))
         self._main_divider()
 
-
     ################ Main Page ################
 
     def ask_generic_input(self):
@@ -189,7 +188,6 @@ class UserInterface:
             elif selection == '7':  # return
                 return selection, None
 
-
     def ask_timesheet_management_input(self):
         """
         Page for timesheet management.
@@ -262,7 +260,7 @@ class UserInterface:
 
     ################ Specific User Inputs ################
 
-    def user_return(self): #TODO: Dependencies list
+    def user_return(self):  # TODO: Dependencies list
         """
         Tells the user to hit enter to return, but works for any key (doesn't matter what they press, just need a press)
         """
@@ -311,12 +309,11 @@ class UserInterface:
                 return day.lower()
             else:
                 day = input("What day do you want to summarize?\n\tAvailable options:\n\t"
-                      "1. YYYY-MM-DD\n\t"
-                      "2. Today\n\t"
-                      "3. Yesterday\n\t...")
+                            "1. YYYY-MM-DD\n\t"
+                            "2. Today\n\t"
+                            "3. Yesterday\n\t...")
                 valid = self._check_date_validity(day)
         return day
-
 
     ################ Specific Functions ################
 
@@ -325,7 +322,7 @@ class UserInterface:
         Page for starting the logging of time.
         :param name: name of task
         """
-        start_time = time.strftime("%H:%M:%S", time.gmtime()) # may lose a second on loading time between functions
+        start_time = time.strftime("%H:%M:%S", time.localtime())  # may lose a second on loading time between functions
         self.banner()
         print("Starting to log time on {} at {}".format(name, start_time))
         while input("\nPress ENTER to end logging...") != "": continue
