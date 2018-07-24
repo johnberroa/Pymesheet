@@ -1,5 +1,5 @@
 """
-Timesheet class
+TimesheetManager class
 Creates a Pandas dataframe that records time worked on various user specified tasks.
 Connects to a user interface for ease of use.
 @author: John Berroa
@@ -9,7 +9,7 @@ import pendulum, time, pickle, os
 from user_interface import UserInterface
 from time_utils import Converter
 
-VERSION = ".9"
+VERSION = ".9.1"
 
 
 # TODO: Start work day option?  := general/other += (end-start) - sum(all_today)
@@ -84,6 +84,8 @@ class TimesheetManager:
                 self.backup_timesheet(string)
             elif code == '46':
                 self.save_config(string)
+            elif code == 'debug':
+                self.debug()
 
             self.UI.banner()  # places banner at top of each new page
 
@@ -291,7 +293,6 @@ class TimesheetManager:
             print("There is no data for the selected date ({}).".format(day))
         else:
             time = self.data[day].sum()
-            print("t", time)
             if time == 0:
                 print("No Tasks were logged on {}.".format(day))
             else:
@@ -299,11 +300,9 @@ class TimesheetManager:
                 hours, mins = Converter.min2hour(mins)
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
                 days, hours_day = Converter.hour2day(hours)
-                day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
                 print("Summary for {}:".format(day))  # TODO: Make prettier
                 self.UI.summary_divider()
                 print(hour_min_string)
-                print(day_hour_min_string)
                 print("PLACEHOLDER time till 40")
                 print("dbug", self.data)
         self.UI.user_return()
@@ -314,11 +313,9 @@ class TimesheetManager:
             print("There is no Task named '{}'.".format(task))
         else:
             time = self.data.loc[task].sum()
-            print(time)
             if time == 0:
                 print("No time was logged for Task '{}'.".format(task))
             else:
-                print("[TODO] NEEDS TO BE DOUBLE CHECKED WITH MULTIPLE COLUMNS")
                 mins = Converter.sec2min(time)
                 hours, mins = Converter.min2hour(mins)
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
@@ -328,7 +325,6 @@ class TimesheetManager:
                 self.UI.summary_divider()
                 print(hour_min_string)
                 print(day_hour_min_string)
-                print("dbug", self.data)
         self.UI.user_return()
 
     def time_per_taskday(self, task, day):
@@ -346,26 +342,20 @@ class TimesheetManager:
             skip = True
         if not skip:
             time = self.data[day].loc[task]
-            print(time)
             if time == 0:
                 print("No time was logged for Task '{}' on {}.".format(task, day))
             else:
                 mins = Converter.sec2min(time)
                 hours, mins = Converter.min2hour(mins)
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
-                days, hours_day = Converter.hour2day(hours)
-                day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
                 print("Summary for '{}' on {}:".format(task, day))  # TODO: Make prettier
                 self.UI.summary_divider()
                 print(hour_min_string)
-                print(day_hour_min_string)
-                print("dbug", self.data)
         self.UI.user_return()
 
     def total_time(self):
         self.UI.banner()
         time = self.data.values.sum()
-        print(time)
         if time == 0:
             print("No time has been logged in this Timesheet yet.")
         else:
@@ -378,7 +368,14 @@ class TimesheetManager:
             self.UI.summary_divider()
             print(hour_min_string)
             print(day_hour_min_string)
-            print("dbug", self.data)
+        self.UI.user_return()
+
+    ################ Time Functions ################
+
+    def debug(self):
+        self.UI.banner()
+        print("[DEBUG] Printing head(20) of underlying dataframe...\n")
+        print(self.data.head(20))
         self.UI.user_return()
 
 

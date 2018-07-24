@@ -67,7 +67,7 @@ class UserInterface:
         print("\t[5] Help")
         print("\t[6] Quit")
         selection = None
-        while selection not in ["1", "2", "3", "4", "5", "6"]:
+        while selection not in ["1", "2", "3", "4", "5", "6", "debug"]:
             selection = input("\t...")
             if selection == "1":  # Log time
                 task = self._ask_what_string(work=True)
@@ -91,6 +91,9 @@ class UserInterface:
                 self.banner()
                 print("Exiting...")
                 sys.exit()
+            elif selection.lower() == 'debug':  # Print the dataframe
+                self.banner()
+                return selection, ''
 
     ################ Sub Pages ################
 
