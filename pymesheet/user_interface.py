@@ -20,6 +20,7 @@ class UserInterface:
         self.today = today
         self.name = name
         self.banner()
+        self.working = False
         if new:
             print("New Timesheet created for '{}'!".format(name))
         else:
@@ -59,35 +60,45 @@ class UserInterface:
         Main menu. This function talks to the timesheet class
         :return: selection number (what function to use in timesheet), and task name if applicable
         """
+        if self.working: print("[NOTICE] Workday active\n")
         print("Please select desired function:\n")
         print("\t[1] Start logging time for a Task...")
-        print("\t[2] Get time summaries...")
-        print("\t[3] Task management...")
-        print("\t[4] Timesheet management...")
-        print("\t[5] Help")
-        print("\t[6] Quit")
+        print("\t[2] Start work day [IN DEVELOPMENT]") if not self.working else print(
+            "\t[2] End work day [IN DEVELOPMENT]")
+        print("\t[3] Get time summaries...")
+        print("\t[4] Task management...")
+        print("\t[5] Timesheet management...")
+        print("\t[6] Help")
+        print("\t[7] Quit")
         selection = None
-        while selection not in ["1", "2", "3", "4", "5", "6", "debug"]:
+        while selection not in ["1", "2", "3", "4", "5", "6", "7" "debug"]:
             selection = input("\t...")
             if selection == "1":  # Log time
                 task = self._ask_what_string(work=True)
                 return selection, task
-            elif selection == '2':  # Summary
+            elif selection == '2':  # toggle work day
+                if self.working:
+                    self.working = False
+                    return selection, "stop"
+                else:
+                    self.working = True
+                    return selection, 'start'
+            elif selection == '3':  # Summary
                 second_selection, summary_request = self.ask_time_summaries_input()
                 selection = selection + second_selection
                 return selection, summary_request
-            elif selection == '3':  # Task management
+            elif selection == '4':  # Task management
                 second_selection, task = self.ask_task_management_input()
                 selection = selection + second_selection
                 return selection, task
-            elif selection == '4':  # Timesheet management
+            elif selection == '5':  # Timesheet management
                 second_selection, sheet = self.ask_timesheet_management_input()
                 selection = selection + second_selection
                 return selection, sheet
-            elif selection == '5':  # Help
+            elif selection == '6':  # Help
                 self._help("main")
                 return 0, '0'
-            elif selection == '6':  # Quit
+            elif selection == '7':  # Quit
                 self.banner()
                 print("Exiting...")
                 sys.exit()
@@ -108,7 +119,7 @@ class UserInterface:
             print("It can track any number of tasks, and persists your work log indefinitely.")
             print("Various summary functions allow you to analyze your time effortlessly.")
             print("When selecting Timesheets or Tasks, you have to type out their full names.")
-            print("This is to prevent accidental deletions.")
+            print("This is to prevent accidental deletions.")  # TODO: needs updating
             print("\nAt the main menu, the following options are available:")
             print("1) Start logging time for a Task:\n  -Record time worked on a specific Task.")
             print("2) Get time summaries:\n  -Get statistics on data within the Timesheet.")
@@ -194,7 +205,7 @@ class UserInterface:
     def ask_timesheet_management_input(self):
         """
         Page for timesheet management.
-        :return: selection and sheet to fulfill requirements by TimesheetManager for a return
+        :return: selection and sheet to fulfill requirements by TimesheetManager for a return  # TODO: Put export in here and update help page
         """
         self.banner()
         print("Please select desired Timesheet management function:\n")
@@ -263,7 +274,7 @@ class UserInterface:
 
     ################ Specific User Inputs ################
 
-    def user_return(self):  # TODO: Dependencies list
+    def user_return(self):
         """
         Tells the user to hit enter to return, but works for any key (doesn't matter what they press, just need a press)
         """

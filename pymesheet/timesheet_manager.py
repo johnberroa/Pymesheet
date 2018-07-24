@@ -12,7 +12,8 @@ from time_utils import Converter
 VERSION = ".9.1"
 
 
-# TODO: Start work day option?  := general/other += (end-start) - sum(all_today)
+# TODO: Csv export with warning
+# TODO: Import baseline or whatever I called it
 
 def clear():
     """
@@ -54,35 +55,40 @@ class TimesheetManager:
 
             if code == '1':
                 self.start_task(string)
-            elif code == '21':
-                self.time_per_task(string)
-            elif code == '22':
-                self.time_per_day(string)
-            elif code == '23':
-                self.time_per_taskday(*string)
-            elif code == '24':
-                self.total_time()
+            elif code == '2':
+                if string == 'start':
+                    self.working_start = time.time()
+                else:
+                    self.add_workday()
             elif code == '31':
-                self.list_tasks()
-            elif code == '33':
-                self.delete_task(string)
+                self.time_per_task(string)
             elif code == '32':
-                self.add_task(string)
+                self.time_per_day(string)
             elif code == '33':
-                self.delete_task(string)
+                self.time_per_taskday(*string)
+            elif code == '34':
+                self.total_time()
             elif code == '41':
-                self.list_timesheets()
-            elif code == '42':
-                self.create_new_timesheet(string)
+                self.list_tasks()
             elif code == '43':
+                self.delete_task(string)
+            elif code == '42':
+                self.add_task(string)
+            elif code == '43':
+                self.delete_task(string)
+            elif code == '51':
+                self.list_timesheets()
+            elif code == '52':
+                self.create_new_timesheet(string)
+            elif code == '53':
                 self.data = self.load_timesheet(string)
                 print("{} Timesheet loaded.".format(string))
                 self.UI.user_return()
-            elif code == '44':
+            elif code == '54':
                 self.delete_timesheet(string)
-            elif code == '45':
+            elif code == '55':
                 self.backup_timesheet(string)
-            elif code == '46':
+            elif code == '56':
                 self.save_config(string)
             elif code == 'debug':
                 self.debug()
@@ -168,7 +174,7 @@ class TimesheetManager:
         backup folder
         :param name: name of timesheet to backup
         """
-        path = os.path.join(self.path, "backup")
+        path = os.path.join(self.path, ".backup")
         os.makedirs(path, exist_ok=True)
         data = self.load_timesheet(name)
         self.save_timesheet(path, name, data)
@@ -234,6 +240,25 @@ class TimesheetManager:
         print("Time successfully recorded!")
         self.UI.user_return()
 
+    def add_workday(self):  # TODO: Doublecheck
+        work_time = time.time() - self.working_start
+        self.UI.banner()
+        if "General" not in self.data.index:
+            print("No Task exists to log general work time...creating Task 'General'")
+            self.add_task("General")
+        already_workday_time = self.data.at["General", self.today.to_date_string()]
+        allocated_time = self.data[self.today.to_date_string()].sum()
+        workday = work_time - already_workday_time - allocated_time
+        if workday < 0:
+            print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
+            self.UI.user_return()
+        else:
+            self.data.at["General", self.today.to_date_string()] += int(workday)  # do not care about ms
+            print("Total hours accumulated during the work day: {}")
+            print("Total hours set as general tasks: {}")
+            print("\nWork day ended!")
+            self.UI.user_return()
+
     ################ Task Functions ################
 
     def list_tasks(self):
@@ -292,11 +317,11 @@ class TimesheetManager:
         if day not in self.data.columns:
             print("There is no data for the selected date ({}).".format(day))
         else:
-            time = self.data[day].sum()
-            if time == 0:
+            times = self.data[day].sum()
+            if times == 0:
                 print("No Tasks were logged on {}.".format(day))
             else:
-                mins = Converter.sec2min(time)
+                mins = Converter.sec2min(times)
                 hours, mins = Converter.min2hour(mins)
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
                 days, hours_day = Converter.hour2day(hours)
@@ -312,11 +337,11 @@ class TimesheetManager:
         if task not in self.data.index:
             print("There is no Task named '{}'.".format(task))
         else:
-            time = self.data.loc[task].sum()
-            if time == 0:
+            times = self.data.loc[task].sum()
+            if times == 0:
                 print("No time was logged for Task '{}'.".format(task))
             else:
-                mins = Converter.sec2min(time)
+                mins = Converter.sec2min(times)
                 hours, mins = Converter.min2hour(mins)
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
                 days, hours_day = Converter.hour2day(hours)
@@ -324,7 +349,7 @@ class TimesheetManager:
                 print("Summary for '{}':".format(task))  # TODO: Make prettier
                 self.UI.summary_divider()
                 print(hour_min_string)
-                print(day_hour_min_string)
+                print(day_hour_min_string)  # TODO: Make the daily string only appear if a day exists
         self.UI.user_return()
 
     def time_per_taskday(self, task, day):
@@ -341,11 +366,11 @@ class TimesheetManager:
             print("There is no data for the selected date ({}).".format(day))
             skip = True
         if not skip:
-            time = self.data[day].loc[task]
-            if time == 0:
+            times = self.data[day].loc[task]
+            if times == 0:
                 print("No time was logged for Task '{}' on {}.".format(task, day))
             else:
-                mins = Converter.sec2min(time)
+                mins = Converter.sec2min(times)
                 hours, mins = Converter.min2hour(mins)
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
                 print("Summary for '{}' on {}:".format(task, day))  # TODO: Make prettier
@@ -355,11 +380,11 @@ class TimesheetManager:
 
     def total_time(self):
         self.UI.banner()
-        time = self.data.values.sum()
-        if time == 0:
+        times = self.data.values.sum()
+        if times == 0:
             print("No time has been logged in this Timesheet yet.")
         else:
-            mins = Converter.sec2min(time)
+            mins = Converter.sec2min(times)
             hours, mins = Converter.min2hour(mins)
             hour_min_string = Converter.convert2string(int(hours), int(mins))
             days, hours_day = Converter.hour2day(hours)
@@ -370,7 +395,7 @@ class TimesheetManager:
             print(day_hour_min_string)
         self.UI.user_return()
 
-    ################ Time Functions ################
+    ################ Debug Functions ################
 
     def debug(self):
         self.UI.banner()
