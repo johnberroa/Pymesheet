@@ -130,7 +130,7 @@ class UserInterface:
             self.user_return()
         elif which == "timesheet":
             print("Here you can create, delete, load, list, or backup Timesheets:\n")
-            print("1) List Timesheets:\n  -Returns a list of all saved Timesheets.")
+            print("1) List Timesheets:\n  -Returns a list of all saved Timesheets.")  # TODO: Update this
             print("2) Create new Timesheet:\n  -Create a new Timesheet with a specific name.")
             print("3) Load a Timesheet:\n  -Load a Timesheet with a given name.")
             print("4) Delete a Timesheet:\n  -Delete a Timesheet with a given name.")
@@ -215,8 +215,10 @@ class UserInterface:
         print("\t[4] Delete a Timesheet...")
         print("\t[5] Backup a Timesheet...")
         print("\t[6] Set default Timesheet...")
-        print("\t[7] Help")
-        print("\t[8] Return")
+        print("\t[7] Set baseline hours...")
+        print("\t[8] Export current Timesheet")
+        print("\t[9] Help")
+        print("\t[10] Return")
         selection = None
         while selection not in ["1", "2", "3", "4", "5", "6", "7", "8"]:
             selection = input("\t...")
@@ -237,10 +239,17 @@ class UserInterface:
             elif selection == '6':  # Default
                 sheet = self._ask_what_string(default=True)
                 return selection, sheet
-            elif selection == '7':  # Help
+            elif selection == '7':  # Baseline
+                print("NOT IMPLEMENTED")
+                self.user_return()
+                # sheet = self._ask_what_string(default=True)
+                return selection, "sheet"
+            elif selection == '8':  # Export
+                return selection, ""
+            elif selection == '9':  # Help
                 self._help("timesheet")
                 return selection, None
-            elif selection == '8':  # Return
+            elif selection == '10':  # Return
                 return selection, None
 
     def ask_task_management_input(self):
@@ -338,7 +347,7 @@ class UserInterface:
         """
         start_time = time.strftime("%H:%M:%S", time.localtime())  # may lose a second on loading time between functions
         self.banner()
-        print("Starting to log time on {} at {}".format(name, start_time))
+        print("Logging time on {}, starting at {}.".format(name, start_time))
         while input("\nPress ENTER to end logging...") != "": continue
 
     def _check_date_validity(self, date):

@@ -9,9 +9,10 @@ import pendulum, time, pickle, os
 from user_interface import UserInterface
 from time_utils import Converter
 
-VERSION = ".9.1"
+VERSION = ".9.2"
 
 
+# TODO: save state between recordings
 # TODO: Csv export with warning
 # TODO: Import baseline or whatever I called it
 
@@ -90,6 +91,8 @@ class TimesheetManager:
                 self.backup_timesheet(string)
             elif code == '56':
                 self.save_config(string)
+            elif code == '58':
+                self.export()
             elif code == 'debug':
                 self.debug()
 
@@ -100,6 +103,18 @@ class TimesheetManager:
     def save_config(self, default):
         """
         Saves default timesheet in a text file for later usage.
+        Format:
+
+        default_timesheet=NAME
+
+        [NAME] #TODO: Implement this
+        workweek=40
+        baseline=23h17m
+
+        [NAME]
+        workweek=
+        baseline=
+
         :param default: name of timesheet to set as default
         """
         self.UI.banner()
@@ -110,12 +125,22 @@ class TimesheetManager:
         self.UI.user_return()
 
     def load_config(self):
+        """
+        Loads config file for general Timesheet management #TODO: How does this deal with timesheet specific configs?
+        :return:
+        """
         config = open("config.data", "r")
         default = config.read()
         default = default.split('=')
         return default[1]
 
     def save_timesheet(self, path, name, data):
+        """
+        Saves current active timesheet at specified path.
+        :param path: path to save
+        :param name: name of Timesheet
+        :param data: data of timesheet
+        """
         path = os.path.join(path, "{}.pkl".format(name))
         pickle.dump(data, open(path, "wb"))
 
@@ -182,6 +207,10 @@ class TimesheetManager:
         self.UI.user_return()
 
     def create_new_timesheet(self, name):
+        """
+        Creates a new timesheet with specified name
+        :param name: Name of new timesheet
+        """
         if name in os.listdir(self.path):
             print("Timesheet '{}' already exists.".format(name))
             self.UI.user_return()
@@ -193,6 +222,29 @@ class TimesheetManager:
             self.UI = UserInterface(name, new, self.today, VERSION)
             self.start_time = 0
             print("New Timesheet with the name '{}' loaded.".format(name))
+            self.UI.user_return()
+
+    def export(self):
+        """
+        Exports data to csv after confirmation dialog
+        """
+        self.UI.banner()
+        export = input("[WARNING] Exporting times from the current Timesheet will allow \n"
+                       "anyone to view the data without the need for unpickling.\n\n"
+                       "Do you wish to continue? [y/n]...")
+        if export.lower() == 'y':
+            self.UI.banner()
+            print("Exporting Timesheet '{}' to '{}.csv'".format(self.name, self.name))
+            self.data.to_csv("{}.csv".format(self.name))
+            print("\nExport successful.")
+            self.UI.user_return()
+        elif export.lower() == 'n':
+            self.UI.banner()
+            print("Exporting canceled.")
+            self.UI.user_return()
+        else:
+            self.UI.banner()
+            print("[WARNING] Invalid input...not exporting.")
             self.UI.user_return()
 
     ################ Logging Functions ################
@@ -240,7 +292,10 @@ class TimesheetManager:
         print("Time successfully recorded!")
         self.UI.user_return()
 
-    def add_workday(self):  # TODO: Doublecheck
+    def add_workday(self):  # TODO: Doublecheck FIRST LOOK SEEMS TO WORK
+        """
+        Adds to task "general" all the time during the workday that was not already assigned to a task.
+        """
         work_time = time.time() - self.working_start
         self.UI.banner()
         if "General" not in self.data.index:
