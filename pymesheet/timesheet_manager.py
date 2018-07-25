@@ -9,11 +9,10 @@ import pendulum, time, pickle, os
 from user_interface import UserInterface
 from time_utils import Converter
 
-VERSION = ".9.2"
+VERSION = ".9.4"
 
 
 # TODO: save state between recordings
-# TODO: Csv export with warning
 # TODO: Import baseline or whatever I called it
 
 def clear():
@@ -28,12 +27,15 @@ class TimesheetManager:
         self.__version__ = VERSION
         self.path = os.path.join(path, "timesheets")
         os.makedirs(self.path, exist_ok=True)
-        self.tz = "local"
+        if "config.data" not in os.listdir():
+            self.create_config()
+        default, tz = self.load_config()
+        self.tz = tz
+        print(self.tz)
         if name is None:
-            try:
-                default = self.load_config()
+            if default != "":
                 name = default
-            except FileNotFoundError:
+            else:
                 clear()
                 print("[SETUP] There is no default Timesheet set.  A temporary Timesheet will be created.")
                 print("\nIf you have not yet created a timesheet, or need to set your default timesheet,")
@@ -90,9 +92,11 @@ class TimesheetManager:
             elif code == '55':
                 self.backup_timesheet(string)
             elif code == '56':
-                self.save_config(string)
+                self.save_config_default(string)
             elif code == '58':
                 self.export()
+            elif code == '57':
+                self.set_baseline()
             elif code == 'debug':
                 self.debug()
 
@@ -100,7 +104,16 @@ class TimesheetManager:
 
     ################ File Management Functions ################
 
-    def save_config(self, default):
+    def create_config(self):
+        """
+        Creates a config with all parameters empty
+        """
+        with open("config.data", "w") as config:
+            config.write("default_timesheet=")
+            config.write("\ntz=local")
+
+
+    def save_config_default(self, default):  # TODO: check if timesheet exists
         """
         Saves default timesheet in a text file for later usage.
         Format:
@@ -118,21 +131,29 @@ class TimesheetManager:
         :param default: name of timesheet to set as default
         """
         self.UI.banner()
-        config = open("config.data", "w")
-        config.write("default_timesheet={}".format(default))
-        config.close()
+        with open("config.data", "r") as config:
+            lines = config.readlines()
+        with open("config.data", 'r+') as config:
+            config.seek(0)  # rewind
+            config.write("default_timesheet={}\n".format(default))  # write the new line before
+            for line in lines[1:]:
+                config.write(line)
         print("{} set as default Timesheet.".format(default))
         self.UI.user_return()
 
     def load_config(self):
         """
-        Loads config file for general Timesheet management #TODO: How does this deal with timesheet specific configs?
-        :return:
+        Loads config file
         """
-        config = open("config.data", "r")
-        default = config.read()
-        default = default.split('=')
-        return default[1]
+        with open("config.data", "r") as config:
+            for line in config.readlines():
+                if line[:7] == "default":
+                    default_line = line
+                elif line[:2] == "tz":
+                    tz_line = line
+            default = default_line.split("=")[1]
+            tz = tz_line.split("=")[1]
+        return default[:-1], tz # to -2 to avoid \n
 
     def save_timesheet(self, path, name, data):
         """
@@ -261,7 +282,7 @@ class TimesheetManager:
             add = input(
                 "[WARNING] '{}' is not in the list of Tasks...would you like to add it? [y/n]...".format(task_name))
             if add.lower() == 'y':
-                self.add_task(task_name)
+                self.add_task(task_name, suppress=True)
                 go_on = True
             elif add.lower() == 'n':
                 go_on = False
@@ -326,11 +347,12 @@ class TimesheetManager:
             print("\t({}) {}".format(i + 1, task))
         self.UI.user_return()
 
-    def add_task(self, task_name):
+    def add_task(self, task_name, suppress=False):
         """
         Adds task to the dataframe by adding it to the index.  If the task already exists, it exits.
         Can take string or [str].
         :param task_name: name of task to add
+        :param suppress: suppresses user blocking input
         """
         self.UI.banner()
         if task_name in self.data.index:
@@ -344,7 +366,7 @@ class TimesheetManager:
             print("Task '{}' created.".format(task_name[0]))
             self.data.fillna(0, inplace=True)
             self.save_timesheet(self.path, self.name, self.data)
-            self.UI.user_return()
+            if not suppress: self.UI.user_return()
 
     def delete_task(self, task_name):
         """

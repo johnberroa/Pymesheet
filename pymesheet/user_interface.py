@@ -240,10 +240,7 @@ class UserInterface:
                 sheet = self._ask_what_string(default=True)
                 return selection, sheet
             elif selection == '7':  # Baseline
-                print("NOT IMPLEMENTED")
-                self.user_return()
-                # sheet = self._ask_what_string(default=True)
-                return selection, "sheet"
+                return selection, ""
             elif selection == '8':  # Export
                 return selection, ""
             elif selection == '9':  # Help
