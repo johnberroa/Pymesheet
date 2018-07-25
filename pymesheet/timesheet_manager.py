@@ -14,7 +14,7 @@ VERSION = ".9.4"
 
 # TODO: save state between recordings
 # TODO: Import baseline or whatever I called it
-
+# TODO: Fix exit of workday when backup, maybe in other situations
 def clear():
     """
     Global function that clears the command line
@@ -112,7 +112,6 @@ class TimesheetManager:
             config.write("default_timesheet=")
             config.write("\ntz=local")
 
-
     def save_config_default(self, default):  # TODO: check if timesheet exists
         """
         Saves default timesheet in a text file for later usage.
@@ -153,7 +152,7 @@ class TimesheetManager:
                     tz_line = line
             default = default_line.split("=")[1]
             tz = tz_line.split("=")[1]
-        return default[:-1], tz # to -2 to avoid \n
+        return default[:-1], tz  # to -2 to avoid \n
 
     def save_timesheet(self, path, name, data):
         """
@@ -165,14 +164,15 @@ class TimesheetManager:
         path = os.path.join(path, "{}.pkl".format(name))
         pickle.dump(data, open(path, "wb"))
 
-    def load_timesheet(self, name):
+    def load_timesheet(self, name, only_data=False):
         """
         Loads a timesheet and sets all the parameters of this class to deal with the new timesheet
         :param name: name of Timesheet
         """
         path = os.path.join(self.path, "{}.pkl".format(name))
-        self.name = name
-        self.UI = UserInterface(name, False, self.today, VERSION)
+        if not only_data:
+            self.name = name
+            self.UI = UserInterface(name, False, self.today, VERSION)
         return pickle.load(open(path, "rb"))
 
     def delete_timesheet(self, name):
@@ -222,7 +222,7 @@ class TimesheetManager:
         """
         path = os.path.join(self.path, ".backup")
         os.makedirs(path, exist_ok=True)
-        data = self.load_timesheet(name)
+        data = self.load_timesheet(name, only_data=True)
         self.save_timesheet(path, name, data)
         print("'{}' successfully backed up.".format(name))
         self.UI.user_return()
@@ -333,6 +333,7 @@ class TimesheetManager:
             print("Total hours accumulated during the work day: {}")
             print("Total hours set as general tasks: {}")
             print("\nWork day ended!")
+            self.save_timesheet(self.path, self.name, self.data)
             self.UI.user_return()
 
     ################ Task Functions ################
