@@ -34,11 +34,11 @@ class UserInterface:
         """
         print("=" * 80)
 
-    def summary_divider(self):
+    def summary_divider(self):  # TODO >v1.0: Make it variable length based on the string it sits under
         """
         Prints a row of --- for a divider
         """
-        print("-" * 40)
+        print("-" * 55)
 
     def banner(self):
         """
@@ -63,8 +63,8 @@ class UserInterface:
         if self.working: print("[NOTICE] Workday active\n")
         print("Please select desired function:\n")
         print("\t[1] Start logging time for a Task...")
-        print("\t[2] Start work day [IN DEVELOPMENT]") if not self.working else print(
-            "\t[2] End work day [IN DEVELOPMENT]")
+        print("\t[2] Start work day") if not self.working else print(
+            "\t[2] End work day")
         print("\t[3] Get time summaries...")
         print("\t[4] Task management...")
         print("\t[5] Timesheet management...")
@@ -119,25 +119,29 @@ class UserInterface:
             print("It can track any number of tasks, and persists your work log indefinitely.")
             print("Various summary functions allow you to analyze your time effortlessly.")
             print("When selecting Timesheets or Tasks, you have to type out their full names.")
-            print("This is to prevent accidental deletions.")  # TODO: needs updating
+            print("This is to prevent accidental deletions.")
             print("\nAt the main menu, the following options are available:")
             print("1) Start logging time for a Task:\n  -Record time worked on a specific Task.")
-            print("2) Get time summaries:\n  -Get statistics on data within the Timesheet.")
-            print("3) Task management:\n  -Create, delete, and list Tasks within the Timesheet.")
-            print("4) Timesheet management:\n  -Create, delete, load, and backup Timesheets.")
-            print("5) Help:\n  -Print this page.")
-            print("6) Quit:\n  -Exit the program.")
+            print("2) Start work day:\n  -Start/stop recording of a workday to fill in non-task specific times.")
+            print("3) Get time summaries:\n  -Get statistics on data within the Timesheet.")
+            print("4) Task management:\n  -Create, delete, and list Tasks within the Timesheet.")
+            print("5) Timesheet management:\n  -Create, delete, load, and backup Timesheets.")
+            print("6) Help:\n  -Print this page.")
+            print("7) Quit:\n  -Exit the program.")
             self.user_return()
         elif which == "timesheet":
             print("Here you can create, delete, load, list, or backup Timesheets:\n")
-            print("1) List Timesheets:\n  -Returns a list of all saved Timesheets.")  # TODO: Update this
+            print("1) List Timesheets:\n  -Returns a list of all saved Timesheets.")
             print("2) Create new Timesheet:\n  -Create a new Timesheet with a specific name.")
             print("3) Load a Timesheet:\n  -Load a Timesheet with a given name.")
             print("4) Delete a Timesheet:\n  -Delete a Timesheet with a given name.")
             print("5) Backup a Timesheet:\n  -Backup a Timesheet in another location (backups folder).")
             print("6) Set default Timesheet:\n  -Set the Timesheet to open on a fresh start of the program.")
-            print("7) Help:\n  -Print this page.")
-            print("8) Return:\n  -Return to the main menu.")
+            print("7) Set baseline hours:\n  -Set previous worked hours as a baseline to add on time to.")
+            print("8) Set workweek hours:\n  -Set how many hours are required each week.")
+            print("9) Export current Timesheet:\n  -Exports the current Timesheet.  Not recommended for privacy.")
+            print("10) Help:\n  -Print this page.")
+            print("11) Return:\n  -Return to the main menu.")
             self.user_return()
         elif which == "task":
             print("Here you can create, delete, or list the tasks within the '{}' Timesheet:\n".format(self.name))
@@ -154,9 +158,8 @@ class UserInterface:
             print("2) Time per day:\n  -See how much time was worked on a specific day.")
             print("3) Time per Task per day:\n  -See how much time was worked for a specific task on a certain day.")
             print("4) Total time:\n  -Display the total amount of time worked.")
-            print("5) Paid/actual time:\n  -Show any discrepancy between scheduled hours and actual hours.")
-            print("6) Help:\n  -Print this page.")
-            print("7) Return:\n  -Return to the main menu.")
+            print("5) Help:\n  -Print this page.")
+            print("6) Return:\n  -Return to the main menu.")
             self.user_return()
 
     def ask_time_summaries_input(self):
@@ -170,9 +173,8 @@ class UserInterface:
         print("\t[2] Time per day...")
         print("\t[3] Time per Task per day...")
         print("\t[4] Total time")
-        print("\t[5] Paid/actual time")
-        print("\t[6] Help")
-        print("\t[7] Return")
+        print("\t[5] Help")
+        print("\t[6] Return")
         selection = None
         while selection not in ["1", "2", "3", "4", "5", "6", "7"]:
             selection = input("\t...")
@@ -188,26 +190,20 @@ class UserInterface:
                 return selection, (task, day)
             elif selection == '4':  # total time
                 return selection, None
-            elif selection == '5':  # paid/actual
-                print("Need to save in config number of part time full time?")
-                # Example code:
-                # part_time_weeks = 8
-                # paid_hours = (part_time_weeks * 20) + ((weeks_worked - part_time_weeks) * 40)
-                # paid_days, paid_excess_hours = Convert.hour2day(paid_hours)
-                # paid_parsed = Converter.convert2string(paid_hours, 0)
-                return selection, None
-            elif selection == '6':  # help
+            elif selection == '5':  # help
                 self._help("summary")
                 return selection, None
-            elif selection == '7':  # return
+            elif selection == '6':  # return
                 return selection, None
 
     def ask_timesheet_management_input(self):
         """
         Page for timesheet management.
-        :return: selection and sheet to fulfill requirements by TimesheetManager for a return  # TODO: Put export in here and update help page
+        :return: selection and sheet to fulfill requirements by TimesheetManager for a return
         """
         self.banner()
+        if self.working: print("[WARNING] This Timesheet is currently recording the workday.  "
+                               "Loading a new Timesheet will lose this information.")
         print("Please select desired Timesheet management function:\n")
         print("\t[1] List Timesheets")
         print("\t[2] Create new Timesheet...")
@@ -216,9 +212,10 @@ class UserInterface:
         print("\t[5] Backup a Timesheet...")
         print("\t[6] Set default Timesheet...")
         print("\t[7] Set baseline hours...")
-        print("\t[8] Export current Timesheet")
-        print("\t[9] Help")
-        print("\t[10] Return")
+        print("\t[8] Set workweek hours...")
+        print("\t[9] Export current Timesheet")
+        print("\t[10] Help")
+        print("\t[11] Return")
         selection = None
         while selection not in ["1", "2", "3", "4", "5", "6", "7", "8"]:
             selection = input("\t...")
@@ -240,13 +237,17 @@ class UserInterface:
                 sheet = self._ask_what_string(default=True)
                 return selection, sheet
             elif selection == '7':  # Baseline
+                base = self._ask_what_string(baseline=True)
+                return selection, base
+            elif selection == '8':  # workweek
+                workweek = self._ask_what_string(workweek=True)
+                return selection, workweek
+            elif selection == '9':  # Export
                 return selection, ""
-            elif selection == '8':  # Export
-                return selection, ""
-            elif selection == '9':  # Help
+            elif selection == '10':  # Help
                 self._help("timesheet")
                 return selection, None
-            elif selection == '10':  # Return
+            elif selection == '11':  # Return
                 return selection, None
 
     def ask_task_management_input(self):
@@ -287,7 +288,7 @@ class UserInterface:
         _ = input("\nPress ENTER to return...")
 
     def _ask_what_string(self, work=False, add=False, delete=False, load=False, remove=False, backup=False,
-                         create=False, default=False, summary=False):
+                         create=False, default=False, summary=False, baseline=False, workweek=False):
         """
         Asks for a task/sheet, and the prompt depends on the context.
         :param work: context for string output (task)
@@ -296,6 +297,8 @@ class UserInterface:
         :param load: context for string output (timesheet)
         :param remove: context for string output (timesheet)
         :param backup: context for string output (timesheet)
+        :param baseline: context for string output (timesheet)
+        :param workweek: context for string output (timesheet)
         :return: task name
         """
         self.banner()
@@ -317,6 +320,12 @@ class UserInterface:
             string = input("What Timesheet will be the default?\n\t...")
         elif summary:
             string = input("Which Task do you want to summarize?\n\t...")
+        elif baseline:
+            string = input("The baseline is how much time was worked before starting to use the Timesheet Manager.\n"
+                           "This time will be added onto the total time to get an accurate image of how much work has\n"
+                           "been completed.\n\nInput time worked in the following format: xxdxxhxxm\n...")
+        elif workweek:
+            string = input("How many hours is a workweek for Timesheet '{}'?...".format(self.name))
         return string
 
     def _ask_for_day(self):

@@ -6,15 +6,16 @@ Connects to a user interface for ease of use.
 """
 import pandas as pd
 import pendulum, time, pickle, os
+from os.path import join as pathjoin
 from user_interface import UserInterface
-from time_utils import Converter
+from time_utils import Converter, TimeCalculator
 
-VERSION = ".9.4"
+VERSION = "1.0"
+CONFIG_PATH = ".config"
 
 
-# TODO: save state between recordings
-# TODO: Import baseline or whatever I called it
-# TODO: Fix exit of workday when backup, maybe in other situations
+# TODO v>1.0: save state between recordings...have temp file created when active recording, deleted when not
+# TODO on start, if this file exists, load it up and start that task again
 def clear():
     """
     Global function that clears the command line
@@ -25,13 +26,13 @@ def clear():
 class TimesheetManager:
     def __init__(self, name=None, path=os.getcwd()):
         self.__version__ = VERSION
-        self.path = os.path.join(path, "timesheets")
+        self.path = pathjoin(path, "timesheets")
         os.makedirs(self.path, exist_ok=True)
-        if "config.data" not in os.listdir():
+        os.makedirs(CONFIG_PATH, exist_ok=True)
+        if "config.data" not in os.listdir(CONFIG_PATH):
             self.create_config()
         default, tz = self.load_config()
         self.tz = tz
-        print(self.tz)
         if name is None:
             if default != "":
                 name = default
@@ -51,6 +52,17 @@ class TimesheetManager:
             new = True
             self.tasks = None
             self.data = pd.DataFrame(index=self.tasks)
+        try:
+            workweek, baseline = self.load_config_timesheet()
+            if workweek != "":
+                self.workweek = int(workweek)
+            else:
+                self.workweek = ""
+            self.baseline = baseline
+        except FileNotFoundError:
+            self.workweek = ""
+            self.baseline = ""
+        self.working_start = None
         self.UI = UserInterface(name, new, self.today, VERSION)
 
         while True:
@@ -93,66 +105,18 @@ class TimesheetManager:
                 self.backup_timesheet(string)
             elif code == '56':
                 self.save_config_default(string)
-            elif code == '58':
+            elif code == '59':
                 self.export()
             elif code == '57':
-                self.set_baseline()
+                self.set_baseline(string)
+            elif code == '58':
+                self.set_workweek(string)
             elif code == 'debug':
                 self.debug()
 
             self.UI.banner()  # places banner at top of each new page
 
     ################ File Management Functions ################
-
-    def create_config(self):
-        """
-        Creates a config with all parameters empty
-        """
-        with open("config.data", "w") as config:
-            config.write("default_timesheet=")
-            config.write("\ntz=local")
-
-    def save_config_default(self, default):  # TODO: check if timesheet exists
-        """
-        Saves default timesheet in a text file for later usage.
-        Format:
-
-        default_timesheet=NAME
-
-        [NAME] #TODO: Implement this
-        workweek=40
-        baseline=23h17m
-
-        [NAME]
-        workweek=
-        baseline=
-
-        :param default: name of timesheet to set as default
-        """
-        self.UI.banner()
-        with open("config.data", "r") as config:
-            lines = config.readlines()
-        with open("config.data", 'r+') as config:
-            config.seek(0)  # rewind
-            config.write("default_timesheet={}\n".format(default))  # write the new line before
-            for line in lines[1:]:
-                config.write(line)
-        print("{} set as default Timesheet.".format(default))
-        self.UI.user_return()
-
-    def load_config(self):
-        """
-        Loads config file
-        """
-        with open("config.data", "r") as config:
-            for line in config.readlines():
-                if line[:7] == "default":
-                    default_line = line
-                elif line[:2] == "tz":
-                    tz_line = line
-            default = default_line.split("=")[1]
-            tz = tz_line.split("=")[1]
-        return default[:-1], tz  # to -2 to avoid \n
 
     def save_timesheet(self, path, name, data):
         """
@@ -161,7 +125,7 @@ class TimesheetManager:
         :param name: name of Timesheet
         :param data: data of timesheet
         """
-        path = os.path.join(path, "{}.pkl".format(name))
+        path = pathjoin(path, "{}.pkl".format(name))
         pickle.dump(data, open(path, "wb"))
 
     def load_timesheet(self, name, only_data=False):
@@ -169,7 +133,7 @@ class TimesheetManager:
         Loads a timesheet and sets all the parameters of this class to deal with the new timesheet
         :param name: name of Timesheet
         """
-        path = os.path.join(self.path, "{}.pkl".format(name))
+        path = pathjoin(self.path, "{}.pkl".format(name))
         if not only_data:
             self.name = name
             self.UI = UserInterface(name, False, self.today, VERSION)
@@ -194,7 +158,7 @@ class TimesheetManager:
                     print("[WARNING] No default Timesheet set, creating a temporary...")
                     _ = input("\nPress ENTER to acknowledge...")
                     self.create_new_timesheet("TEMPORARY")
-            os.remove(os.path.join(self.path, name + ".pkl"))
+            os.remove(pathjoin(self.path, name + ".pkl"))
             print("'{}' deleted.".format(name))
             self.UI.user_return()
         else:
@@ -220,7 +184,7 @@ class TimesheetManager:
         backup folder
         :param name: name of timesheet to backup
         """
-        path = os.path.join(self.path, ".backup")
+        path = pathjoin(self.path, ".backup")
         os.makedirs(path, exist_ok=True)
         data = self.load_timesheet(name, only_data=True)
         self.save_timesheet(path, name, data)
@@ -268,6 +232,112 @@ class TimesheetManager:
             print("[WARNING] Invalid input...not exporting.")
             self.UI.user_return()
 
+    ################ Configuration Functions ################
+
+    def create_config(self):
+        """
+        Creates a config with all parameters empty
+        """
+        with open(pathjoin(CONFIG_PATH, "config.data"), "w") as config:
+            config.write("default_timesheet=")
+            config.write("\ntz=local")
+
+    def save_config_default(self, default):
+        """
+        Saves default timesheet in a text file for later usage.
+        :param default: name of timesheet to set as default
+        """
+        self.UI.banner()
+        with open(pathjoin(CONFIG_PATH, "config.data"), "r") as config:
+            lines = config.readlines()
+        with open(pathjoin(CONFIG_PATH, "config.data"), 'r+') as config:
+            config.seek(0)  # rewind
+            config.write("default_timesheet={}\n".format(default))  # write the new line before
+            for line in lines[1:]:
+                config.write(line)
+        print("'{}' set as default Timesheet.".format(default))
+        self.UI.user_return()
+
+    def save_config_timesheet(self, workweek_hours, baseline):
+        """
+        Saves timesheet specific configurations
+        Format:
+        [NAME]
+        workweek=40
+        baseline=23
+        h17m
+
+        [NAME]
+        workweek=
+        baseline=
+        :param workweek_hours: what the workweek hours are; defaults to what is loaded at start
+        :param baseline: imported already worked times; defaults to what is loaded at start
+        """
+        if "{}-config.data".format(self.name) not in os.listdir(CONFIG_PATH):  # create it if it doesn't exist
+            with open(pathjoin(CONFIG_PATH, "{}-config.data".format(self.name)), "w") as config:
+                config.write("[{}]".format(self.name))
+        with open(pathjoin(CONFIG_PATH, "{}-config.data".format(self.name)), "w") as config:
+            if workweek_hours == None:
+                workweek_hours = ""
+            if baseline == None:
+                baseline = ""
+            config.write("[{}]".format(self.name))
+            config.write("\nworkweek={}".format(workweek_hours))
+            config.write("\nbaseline={}".format(baseline))
+
+    def load_config_timesheet(self):
+        """
+        Loads in timesheet specific config information
+        """
+        with open(pathjoin(CONFIG_PATH, "{}-config.data".format(self.name)), "r") as config:
+            for line in config.readlines():
+                if line[:8] == "workweek":
+                    workweek_line = line
+                elif line[:8] == "baseline":
+                    baseline_line = line
+            workweek = workweek_line.split("=")[1]
+            baseline = baseline_line.split("=")[1]
+        return workweek[:-1], baseline  # to -2 to avoid \n
+
+    def load_config(self):
+        """
+        Loads config file
+        """
+        with open(pathjoin(CONFIG_PATH, "config.data"), "r") as config:
+            for line in config.readlines():
+                if line[:7] == "default":
+                    default_line = line
+                elif line[:2] == "tz":
+                    tz_line = line
+            default = default_line.split("=")[1]
+            tz = tz_line.split("=")[1]
+        return default[:-1], tz  # to -2 to avoid \n
+
+    def set_baseline(self, baseline):
+        """
+        Sets baseline by rewriting file and keeping everything the same except baseline
+        :param baseline: the baseline to write
+        """
+        self.UI.banner()
+        self.save_config_timesheet(self.workweek, baseline)
+        print("Baseline saved for Timesheet '{}'.".format(self.name))
+        self.baseline = baseline
+        self.UI.user_return()
+
+    def set_workweek(self, workweek):
+        """
+        Sets workweek by rewriting file and keeping everything the same except workweek
+        :param workweek: the workweek to write
+        """
+        self.UI.banner()
+        if workweek != "":
+            self.workweek = int(workweek)
+        else:
+            self.workweek = ""
+        self.save_config_timesheet(workweek, self.baseline)
+        print("Workweek saved for Timesheet '{}'.".format(self.name))
+        self.UI.user_return()
+
     ################ Logging Functions ################
 
     def start_task(self, task_name):
@@ -313,12 +383,14 @@ class TimesheetManager:
         print("Time successfully recorded!")
         self.UI.user_return()
 
-    def add_workday(self):  # TODO: Doublecheck FIRST LOOK SEEMS TO WORK
+    def add_workday(self):
         """
         Adds to task "general" all the time during the workday that was not already assigned to a task.
         """
         work_time = time.time() - self.working_start
         self.UI.banner()
+        if self.today.to_date_string() not in self.data.columns:
+            self.data[self.today.to_date_string()] = 0
         if "General" not in self.data.index:
             print("No Task exists to log general work time...creating Task 'General'")
             self.add_task("General")
@@ -329,11 +401,20 @@ class TimesheetManager:
             print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
             self.UI.user_return()
         else:
+            self.UI.banner()
             self.data.at["General", self.today.to_date_string()] += int(workday)  # do not care about ms
-            print("Total hours accumulated during the work day: {}")
-            print("Total hours set as general tasks: {}")
+            work_time_mins = Converter.sec2min(work_time)
+            work_time_hours, work_time_mins = Converter.min2hour(work_time_mins)
+            work_hour_min_string = Converter.convert2string(int(work_time_hours), int(work_time_mins))
+            general = self.data.at["General", self.today.to_date_string()]
+            mins = Converter.sec2min(general)
+            hours, mins = Converter.min2hour(mins)  # TODO: This section still needs testing
+            hour_min_string = Converter.convert2string(int(hours), int(mins))
+            print("Total hours accumulated during the work day: {}".format(work_hour_min_string))
+            print("Total hours set as general tasks: {}".format(hour_min_string))
             print("\nWork day ended!")
             self.save_timesheet(self.path, self.name, self.data)
+            self.working_start = None
             self.UI.user_return()
 
     ################ Task Functions ################
@@ -402,12 +483,24 @@ class TimesheetManager:
                 mins = Converter.sec2min(times)
                 hours, mins = Converter.min2hour(mins)
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
-                days, hours_day = Converter.hour2day(hours)
-                print("Summary for {}:".format(day))  # TODO: Make prettier
+                print("Summary for {}:".format(day))
                 self.UI.summary_divider()
                 print(hour_min_string)
-                print("PLACEHOLDER time till 40")
-                print("dbug", self.data)
+
+                if type(self.workweek) == int:
+                    per_day_minutes = (self.workweek / 5) * 60
+                    per_day_hours, per_day_minutes = Converter.min2hour(per_day_minutes)
+
+                    diff_hours, diff_mins = TimeCalculator.subtract(per_day_hours, per_day_minutes, hours, mins)
+                    print("\nWith a workweek of {} hours, "
+                          "the average daily hours equates to: {}.".format(self.workweek,
+                                                                           Converter.convert2string(int(per_day_hours),
+                                                                                                    int(per_day_minutes)
+                                                                                                    )))  # ugly lol
+                    if diff_hours is not None:
+                        print("{} is left remaining.".format(Converter.convert2string(int(diff_hours), int(diff_mins))))
+                    else:
+                        print("Sufficient hours have been worked today to meet that amount.")
         self.UI.user_return()
 
     def time_per_task(self, task):
@@ -424,10 +517,10 @@ class TimesheetManager:
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
                 days, hours_day = Converter.hour2day(hours)
                 day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
-                print("Summary for '{}':".format(task))  # TODO: Make prettier
+                print("Summary for '{}':".format(task))
                 self.UI.summary_divider()
                 print(hour_min_string)
-                print(day_hour_min_string)  # TODO: Make the daily string only appear if a day exists
+                if days != 0: print(day_hour_min_string)
         self.UI.user_return()
 
     def time_per_taskday(self, task, day):
@@ -451,7 +544,7 @@ class TimesheetManager:
                 mins = Converter.sec2min(times)
                 hours, mins = Converter.min2hour(mins)
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
-                print("Summary for '{}' on {}:".format(task, day))  # TODO: Make prettier
+                print("Summary for '{}' on {}:".format(task, day))
                 self.UI.summary_divider()
                 print(hour_min_string)
         self.UI.user_return()
@@ -467,10 +560,20 @@ class TimesheetManager:
             hour_min_string = Converter.convert2string(int(hours), int(mins))
             days, hours_day = Converter.hour2day(hours)
             day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
-            print("Summary of all time worked:")  # TODO: Make prettier
+            print("Summary of all time worked stored in Timesheet '{}':".format(self.name))
             self.UI.summary_divider()
             print(hour_min_string)
             print(day_hour_min_string)
+            if self.baseline != "":  # TODO v>1.0: make it regex safe
+                print("\nSummary of all time worked including baseline:")
+                self.UI.summary_divider()
+                back_days, back_hours, back_mins = Converter.parse_DHM(self.baseline)
+                total_days = back_days + days
+                total_hours = back_hours + hours_day
+                total_mins = back_mins + mins
+                total_worked_hours = (back_days * 24) + back_hours + hours
+                print(Converter.convert2string(int(total_worked_hours), int(mins)))
+                print(Converter.convert2string_days(int(total_days), int(total_hours), int(total_mins)))
         self.UI.user_return()
 
     ################ Debug Functions ################
