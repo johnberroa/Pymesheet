@@ -10,7 +10,7 @@ from os.path import join as pathjoin
 from user_interface import UserInterface
 from time_utils import Converter, TimeCalculator
 
-VERSION = "1.0"
+VERSION = "1.0.1"
 CONFIG_PATH = ".config"
 
 
@@ -403,13 +403,13 @@ class TimesheetManager:
             self.add_task("General")
         already_workday_time = self.data.at["General", self.today.to_date_string()]
         allocated_time = self.data[self.today.to_date_string()].sum()
-        workday = work_time - already_workday_time - allocated_time  #TODO: This might be wrong
+        workday = (work_time + already_workday_time) - allocated_time
         if workday < 0:
             print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
             self.UI.user_return()
         else:
             self.UI.banner()
-            self.data.at["General", self.today.to_date_string()] += int(workday)  # do not care about ms
+            self.data.at["General", self.today.to_date_string()] = int(workday)  # do not care about ms
             work_time_mins = Converter.sec2min(work_time)
             work_time_hours, work_time_mins = Converter.min2hour(work_time_mins)
             work_hour_min_string = Converter.convert2string(int(work_time_hours), int(work_time_mins))
