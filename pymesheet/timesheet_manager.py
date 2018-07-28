@@ -52,16 +52,7 @@ class TimesheetManager:
             new = True
             self.tasks = None
             self.data = pd.DataFrame(index=self.tasks)
-        try:
-            workweek, baseline = self.load_config_timesheet()
-            if workweek != "":
-                self.workweek = int(workweek)
-            else:
-                self.workweek = ""
-            self.baseline = baseline
-        except FileNotFoundError:
-            self.workweek = ""
-            self.baseline = ""
+        self.init_configs()
         self.working_start = None
         self.UI = UserInterface(name, new, self.today, VERSION)
 
@@ -137,6 +128,7 @@ class TimesheetManager:
         if not only_data:
             self.name = name
             self.UI = UserInterface(name, False, self.today, VERSION)
+            self.init_configs()
         return pickle.load(open(path, "rb"))
 
     def delete_timesheet(self, name):
@@ -338,6 +330,21 @@ class TimesheetManager:
         print("Workweek saved for Timesheet '{}'.".format(self.name))
         self.UI.user_return()
 
+    def init_configs(self):
+        """
+        Just a function to help keep the code clean since this will appear multiple times.
+        """
+        try:
+            workweek, baseline = self.load_config_timesheet()
+            if workweek != "":
+                self.workweek = int(workweek)
+            else:
+                self.workweek = ""
+            self.baseline = baseline
+        except FileNotFoundError:
+            self.workweek = ""
+            self.baseline = ""
+
     ################ Logging Functions ################
 
     def start_task(self, task_name):
@@ -396,7 +403,7 @@ class TimesheetManager:
             self.add_task("General")
         already_workday_time = self.data.at["General", self.today.to_date_string()]
         allocated_time = self.data[self.today.to_date_string()].sum()
-        workday = work_time - already_workday_time - allocated_time
+        workday = work_time - already_workday_time - allocated_time  #TODO: This might be wrong
         if workday < 0:
             print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
             self.UI.user_return()
