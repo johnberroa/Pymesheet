@@ -124,12 +124,13 @@ class TimesheetManager:
         Loads a timesheet and sets all the parameters of this class to deal with the new timesheet
         :param name: name of Timesheet
         """
-        path = pathjoin(self.path, "{}.pkl".format(name))
-        if not only_data:
-            self.name = name
-            self.UI = UserInterface(name, False, self.today, VERSION)
-            self.init_configs()
-        return pickle.load(open(path, "rb"))
+        if name != "":
+            path = pathjoin(self.path, "{}.pkl".format(name))
+            if not only_data:
+                self.name = name
+                self.UI = UserInterface(name, False, self.today, VERSION)
+                self.init_configs()
+            return pickle.load(open(path, "rb"))
 
     def delete_timesheet(self, name):
         """
@@ -137,25 +138,26 @@ class TimesheetManager:
         :param name: name of timesheet to delete
         """
         self.UI.banner()
-        decision = None
-        while decision not in ["y", "n"]:
-            decision = input("[WARNING] Confirm DELETION of Timesheet '{}' [y/n]: ".format(name)).lower()
-        if decision == "y":
-            if name == self.name:
-                print("[WARNING] Deleting current Timesheet, new current Timesheet will be the default.")
-                _ = input("\nPress ENTER to continue...")
-                try:
-                    self.data = self.load_timesheet(self.load_config())
-                except FileNotFoundError:
-                    print("[WARNING] No default Timesheet set, creating a temporary...")
-                    _ = input("\nPress ENTER to acknowledge...")
-                    self.create_new_timesheet("TEMPORARY")
-            os.remove(pathjoin(self.path, name + ".pkl"))
-            print("'{}' deleted.".format(name))
-            self.UI.user_return()
-        else:
-            print("'{}' not deleted.".format(name))
-            self.UI.user_return()
+        if name != "":
+            decision = None
+            while decision not in ["y", "n"]:
+                decision = input("[WARNING] Confirm DELETION of Timesheet '{}' [y/n]: ".format(name)).lower()
+            if decision == "y":
+                if name == self.name:
+                    print("[WARNING] Deleting current Timesheet, new current Timesheet will be the default.")
+                    _ = input("\nPress ENTER to continue...")
+                    try:
+                        self.data = self.load_timesheet(self.load_config()[0])
+                    except FileNotFoundError:
+                        print("[WARNING] No default Timesheet set, creating a temporary...")
+                        _ = input("\nPress ENTER to acknowledge...")
+                        self.create_new_timesheet("TEMPORARY")
+                os.remove(pathjoin(self.path, name + ".pkl"))
+                print("'{}' deleted.".format(name))
+                self.UI.user_return()
+            else:
+                print("'{}' not deleted.".format(name))
+                self.UI.user_return()
 
     def list_timesheets(self):
         """
@@ -163,7 +165,7 @@ class TimesheetManager:
         """
         self.UI.banner()
         print("List of Timesheets:")
-        i = 1
+        i = 1  # need this because it will also pick up non .pkls if using enumerate
         for timesheet in os.listdir(self.path):
             if timesheet[-4:] == '.pkl':
                 print("\t({}) {}".format(i, timesheet))
@@ -192,14 +194,15 @@ class TimesheetManager:
             print("Timesheet '{}' already exists.".format(name))
             self.UI.user_return()
         else:
-            self.name = name
-            new = True
-            self.tasks = None
-            self.data = pd.DataFrame(index=self.tasks)
-            self.UI = UserInterface(name, new, self.today, VERSION)
-            self.start_time = 0
-            print("New Timesheet with the name '{}' loaded.".format(name))
-            self.UI.user_return()
+            if name != "":
+                self.name = name
+                new = True
+                self.tasks = None
+                self.data = pd.DataFrame(index=self.tasks)
+                self.UI = UserInterface(name, new, self.today, VERSION)
+                self.start_time = 0
+                print("New Timesheet with the name '{}' loaded.".format(name))
+                self.UI.user_return()
 
     def export(self):
         """
@@ -350,30 +353,31 @@ class TimesheetManager:
     def start_task(self, task_name):
         """
         Starts the recording process.  Quietly calls _end_task when done, to record the time into the data.  Creates a
-        new task if provided a task not already existing.
+        new task if provided task is not already existing.
         :param task_name: task to record
         """
         go_on = True
-        if task_name not in self.data.index:
-            self.UI.banner()
-            add = input(
-                "[WARNING] '{}' is not in the list of Tasks...would you like to add it? [y/n]...".format(task_name))
-            if add.lower() == 'y':
-                self.add_task(task_name, suppress=True)
-                go_on = True
-            elif add.lower() == 'n':
-                go_on = False
-            else:
-                print("[WARNING] Invalid input...not creating new Task and returning to the main menu...")
-                go_on = False
-                self.UI.user_return()
-        if go_on:
-            if self.today.to_date_string() not in self.data.columns:
-                self.data[self.today.to_date_string()] = 0
-            start_time = time.time()
-            # Start the UI logging time, once stopped through the UI, record the time
-            self.UI.timelogger(task_name)
-            self._end_task(task_name, start_time)
+        if task_name != "":
+            if task_name not in self.data.index:
+                self.UI.banner()
+                add = input(
+                    "[WARNING] '{}' is not in the list of Tasks...would you like to add it? [y/n]...".format(task_name))
+                if add.lower() == 'y':
+                    self.add_task(task_name, suppress=True)
+                    go_on = True
+                elif add.lower() == 'n':
+                    go_on = False
+                else:
+                    print("[WARNING] Invalid input...not creating new Task and returning to the main menu...")
+                    go_on = False
+                    self.UI.user_return()
+            if go_on:
+                if self.today.to_date_string() not in self.data.columns:
+                    self.data[self.today.to_date_string()] = 0
+                start_time = time.time()
+                # Start the UI logging time, once stopped through the UI, record the time
+                self.UI.timelogger(task_name)
+                self._end_task(task_name, start_time)
 
     def _end_task(self, name, start_time):
         """
@@ -448,14 +452,15 @@ class TimesheetManager:
             print("Task '{}' already in Timesheet '{}'.".format(task_name, self.name))
             self.UI.user_return()
         else:
-            if type(task_name) == str:
-                task_name = [task_name]
-            new_task = pd.DataFrame(index=task_name)
-            self.data = self.data.append(new_task, verify_integrity=True, sort=False)
-            print("Task '{}' created.".format(task_name[0]))
-            self.data.fillna(0, inplace=True)
-            self.save_timesheet(self.path, self.name, self.data)
-            if not suppress: self.UI.user_return()
+            if task_name != "":
+                if type(task_name) == str:
+                    task_name = [task_name]
+                new_task = pd.DataFrame(index=task_name)
+                self.data = self.data.append(new_task, verify_integrity=True, sort=False)
+                print("Task '{}' created.".format(task_name[0]))
+                self.data.fillna(0, inplace=True)
+                self.save_timesheet(self.path, self.name, self.data)
+                if not suppress: self.UI.user_return()
 
     def delete_task(self, task_name):
         """
@@ -464,8 +469,9 @@ class TimesheetManager:
         """
         self.UI.banner()
         if task_name not in self.data.index:
-            print("'{}' task not in database.".format(task_name))
-            self.UI.user_return()
+            if task_name != "":
+                print("'{}' task not in database.".format(task_name))
+                self.UI.user_return()
         else:
             self.data.drop(task_name, inplace=True)
             self.save_timesheet(self.path, self.name, self.data)
