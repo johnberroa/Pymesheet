@@ -10,7 +10,7 @@ from os.path import join as pathjoin
 from user_interface import UserInterface
 from time_utils import Converter, TimeCalculator
 
-VERSION = "1.0.1"
+VERSION = "1.0.2"
 CONFIG_PATH = ".config"
 
 
