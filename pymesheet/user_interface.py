@@ -347,6 +347,8 @@ class UserInterface:
                             "2. Today\n\t"
                             "3. Yesterday\n\t...")
                 valid = self._check_date_validity(day)
+            if day == "":
+                break
         return day
 
     ################ Specific Functions ################

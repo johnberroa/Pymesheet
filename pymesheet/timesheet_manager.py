@@ -167,7 +167,7 @@ class TimesheetManager:
         Lists Timesheets saved
         """
         self.UI.banner()
-        print("List of Timesheets:")
+        print("List of Timesheets:\n")
         i = 1  # need this because it will also pick up non .pkls if using enumerate
         for timesheet in os.listdir(self.path):
             if timesheet[-4:] == '.pkl':
@@ -341,7 +341,7 @@ class TimesheetManager:
         Just a function to help keep the code clean since this will appear multiple times.
         """
         try:
-            workweek, baseline = self.load_config_timesheet()
+            workweek, baseline = self.load_config_timesheet()  #TODO: Bugfix, this will not reset baseline when creating a new timesheet frmo a timesheet with a baseline
             if workweek != "":
                 self.workweek = int(workweek)
             else:
@@ -504,9 +504,12 @@ class TimesheetManager:
                 mins = Converter.sec2min(times)
                 hours, mins = Converter.min2hour(mins)
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
-                print("Summary for {}:".format(day))
+                print("Summary for {}:".format(day))  #TODO: In progress
                 self.UI.summary_divider()
-                print(hour_min_string)
+                if hours == 0:
+                    print(hour_min_string.split(", ")[1])
+                else:
+                    print(hour_min_string)
 
                 if type(self.workweek) == int:
                     per_day_minutes = (self.workweek / 5) * 60
@@ -544,7 +547,10 @@ class TimesheetManager:
                 day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
                 print("Summary for '{}':".format(task))
                 self.UI.summary_divider()
-                print(hour_min_string)
+                if hours == 0:
+                    print(hour_min_string.split(", ")[1])
+                else:
+                    print(hour_min_string)
                 if days != 0: print(day_hour_min_string)
         self.UI.user_return()
 
@@ -576,7 +582,10 @@ class TimesheetManager:
                 hour_min_string = Converter.convert2string(int(hours), int(mins))
                 print("Summary for '{}' on {}:".format(task, day))
                 self.UI.summary_divider()
-                print(hour_min_string)
+                if hours == 0:
+                    print(hour_min_string.split(", ")[1])
+                else:
+                    print(hour_min_string)
         self.UI.user_return()
 
     def total_time(self):
@@ -595,7 +604,10 @@ class TimesheetManager:
             day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
             print("Summary of all time worked stored in Timesheet '{}':".format(self.name))
             self.UI.summary_divider()
-            print(hour_min_string)
+            if hours == 0:
+                print(hour_min_string.split(", ")[1])
+            else:
+                print(hour_min_string)
             print(day_hour_min_string)
             if self.baseline != "":  # TODO v>1.0: make it regex safe
                 print("\nSummary of all time worked including baseline:")
@@ -625,7 +637,8 @@ class TimesheetManager:
                 max_len = len(task)
         # Start report
         print("Current Week Report")
-        print("=" * 19)
+        # print("=" * 19)
+        print(self.UI.summary_divider())  #TODO: Why does it print None under the line when the summary divider is used?
         for day in reversed(workdays):
             day_string = day
             day = pendulum.parse(day)
