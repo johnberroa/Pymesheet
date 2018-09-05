@@ -158,8 +158,10 @@ class UserInterface:
             print("2) Time per day:\n  -See how much time was worked on a specific day.")
             print("3) Time per Task per day:\n  -See how much time was worked for a specific task on a certain day.")
             print("4) Total time:\n  -Display the total amount of time worked.")
-            print("5) Help:\n  -Print this page.")
-            print("6) Return:\n  -Return to the main menu.")
+            print("5) Weekly Report:\n  -Display all task information and their corresponding times for the current "
+                  "work week.")
+            print("6) Help:\n  -Print this page.")
+            print("7) Return:\n  -Return to the main menu.")
             self.user_return()
 
     def ask_time_summaries_input(self):
@@ -173,8 +175,9 @@ class UserInterface:
         print("\t[2] Time per day...")
         print("\t[3] Time per Task per day...")
         print("\t[4] Total time")
-        print("\t[5] Help")
-        print("\t[6] Return")
+        print("\t[5] Weekly Report")
+        print("\t[6] Help")
+        print("\t[7] Return")
         selection = None
         while selection not in ["1", "2", "3", "4", "5", "6", "7"]:
             selection = input("\t...")
@@ -190,10 +193,12 @@ class UserInterface:
                 return selection, (task, day)
             elif selection == '4':  # total time
                 return selection, None
-            elif selection == '5':  # help
+            elif selection == '5':  # weekly report
+                return selection, None
+            elif selection == '6':  # help
                 self._help("summary")
                 return selection, None
-            elif selection == '6':  # return
+            elif selection == '7':  # return
                 return selection, None
 
     def ask_timesheet_management_input(self):

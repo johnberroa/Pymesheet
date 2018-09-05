@@ -9,8 +9,9 @@ import pendulum, time, pickle, os
 from os.path import join as pathjoin
 from user_interface import UserInterface
 from time_utils import Converter, TimeCalculator
+from utils import get_current_week_days, generate_day_dict
 
-VERSION = "1.0.2"
+VERSION = "1.1"
 CONFIG_PATH = ".config"
 
 
@@ -74,6 +75,8 @@ class TimesheetManager:
                 self.time_per_taskday(*string)
             elif code == '34':
                 self.total_time()
+            elif code == "35":
+                self.weekly_report()
             elif code == '41':
                 self.list_tasks()
             elif code == '43':
@@ -410,6 +413,7 @@ class TimesheetManager:
         workday = (work_time + already_workday_time) - allocated_time
         if workday < 0:
             print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
+            print("[DEBUG]", workday)
             self.UI.user_return()
         else:
             self.UI.banner()
@@ -419,7 +423,7 @@ class TimesheetManager:
             work_hour_min_string = Converter.convert2string(int(work_time_hours), int(work_time_mins))
             general = self.data.at["General", self.today.to_date_string()]
             mins = Converter.sec2min(general)
-            hours, mins = Converter.min2hour(mins)  # TODO: This section still needs testing
+            hours, mins = Converter.min2hour(mins)  # TODO: This section still needs testing (official)
             hour_min_string = Converter.convert2string(int(hours), int(mins))
             print("Total hours accumulated during the work day: {}".format(work_hour_min_string))
             print("Total hours set as general tasks: {}".format(hour_min_string))
@@ -481,6 +485,10 @@ class TimesheetManager:
     ################ Time Functions ################
 
     def time_per_day(self, day):
+        """
+        Reports total time worked on given day
+        :param day: day to report
+        """
         self.UI.banner()
         if day == "today":
             day = self.today.to_date_string()
@@ -517,6 +525,10 @@ class TimesheetManager:
         self.UI.user_return()
 
     def time_per_task(self, task):
+        """
+        Reports total time worked for given task
+        :param task: task to report
+        """
         self.UI.banner()
         if task not in self.data.index:
             print("There is no Task named '{}'.".format(task))
@@ -537,6 +549,11 @@ class TimesheetManager:
         self.UI.user_return()
 
     def time_per_taskday(self, task, day):
+        """
+        Reports total time for a given task on a given day
+        :param task: task to report
+        :param day: day to report on
+        """
         self.UI.banner()
         skip = False
         if day == "today":
@@ -563,6 +580,9 @@ class TimesheetManager:
         self.UI.user_return()
 
     def total_time(self):
+        """
+        Report on total time worked
+        """
         self.UI.banner()
         times = self.data.values.sum()
         if times == 0:
@@ -587,6 +607,41 @@ class TimesheetManager:
                 total_worked_hours = (back_days * 24) + back_hours + hours
                 print(Converter.convert2string(int(total_worked_hours), int(mins)))
                 print(Converter.convert2string_days(int(total_days), int(total_hours), int(total_mins)))
+        self.UI.user_return()
+
+    def weekly_report(self):
+        self.UI.banner()
+        workdays = get_current_week_days(self.today)
+        tasks = self.data.index
+        report_data = generate_day_dict(workdays, tasks)
+        # Fill up dictionary with data
+        for day in workdays:
+            for task in tasks:
+                report_data[day][task] = self.data[day].loc[task]
+        # Get max length of tasks so that spacing works out
+        max_len = 0
+        for task in tasks:
+            if len(task) > max_len:
+                max_len = len(task)
+        # Start report
+        print("Current Week Report")
+        print("=" * 19)
+        for day in reversed(workdays):
+            day_string = day
+            day = pendulum.parse(day)
+            print("{}, {}".format(Converter.convert_int2day(day.day_of_week), day_string[5:]))
+            print("-" * 16)  # length of Wednesday string
+            for task in tasks:
+                value = report_data[day_string][task]
+                if value != 0:
+                    mins = Converter.sec2min(value)
+                    hours, mins = Converter.min2hour(mins)
+                    hour_min_string = Converter.convert2string(int(hours), int(mins))
+                    if len(task) < max_len:
+                        string = "{}:".format(task) + (" " * (max_len - len(task)))
+                    else:
+                        string = "{}:".format(task)
+                    print("\t" + string + "\t{}".format(hour_min_string))
         self.UI.user_return()
 
     ################ Debug Functions ################
