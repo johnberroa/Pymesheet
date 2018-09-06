@@ -34,11 +34,11 @@ class UserInterface:
         """
         print("=" * 80)
 
-    def summary_divider(self):  # TODO >v1.0: Make it variable length based on the string it sits under
+    def summary_divider(self, text):
         """
         Prints a row of --- for a divider
         """
-        print("-" * 55)
+        print("-" * len(text))
 
     def banner(self):
         """

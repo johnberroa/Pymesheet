@@ -1,5 +1,6 @@
 import pendulum
 
+
 def get_current_week_days(today):
     """
     Returns the datetimes for all days in the current work week as strings
@@ -15,6 +16,7 @@ def get_current_week_days(today):
         new_day = today.subtract(days=day)
         days.append(new_day)
     return [d.to_date_string() for d in days]
+
 
 def generate_day_dict(days, tasks):
     """
