@@ -13,6 +13,7 @@ from utils import get_current_week_days, generate_day_dict
 
 VERSION = "1.3"
 CONFIG_PATH = ".config"
+STATE_PATH = "."
 
 
 # TODO v>1.0: save state between recordings...have temp file created when active recording, deleted when not
@@ -30,10 +31,12 @@ class TimesheetManager:
         self.path = pathjoin(path, "timesheets")
         os.makedirs(self.path, exist_ok=True)
         os.makedirs(CONFIG_PATH, exist_ok=True)
-        if "config.data" not in os.listdir(CONFIG_PATH):
+        if "config.data" not in os.listdir(CONFIG_PATH):  # TODO: Does this work?
             self.create_config()
         default, tz = self.load_config()
+        print(default, type(tz))
         self.tz = tz
+        print(self.tz)
         if name is None:
             if default != "":
                 name = default
@@ -56,6 +59,11 @@ class TimesheetManager:
         self.init_configs()
         self.working_start = None
         self.UI = UserInterface(name, new, self.today, VERSION)
+
+        if ".state" in os.listdir(STATE_PATH):
+            print("[DEBUG] Saved STATE found!")
+            task, start = self.load_state()
+            self.start_task_from_state(task, start)
 
         while True:
             code, string = self.UI.ask_generic_input()
@@ -230,6 +238,35 @@ class TimesheetManager:
             print("[WARNING] Invalid input...not exporting.")
             self.UI.user_return()
 
+    ################ State Functions ################
+
+    def create_state(self, task, start):
+        """
+        Creates a hidden state file with the current task and time being recording so it can be started again in
+        case of failure.  No need to check for existence since it will always be deleted on startup.
+        :param task: task being recorded
+        :param start: starting time of task
+        """
+        with open(pathjoin(STATE_PATH, ".state"), "w") as state:
+            state.write("{}={}".format(task, start))
+
+    def load_state(self):
+        """
+        Loads the information in the saved state file
+        :return: the task and start time of the info in the file
+        """
+        with open(pathjoin(STATE_PATH, ".state"), "r") as state:
+            old = state.read().split("=")
+            task = old[0]
+            start = old[1]
+        return task, start
+
+    def delete_state(self):
+        """
+        Deletes the state file
+        """
+        os.remove(pathjoin(STATE_PATH, ".state"))
+
     ################ Configuration Functions ################
 
     def create_config(self):
@@ -378,9 +415,24 @@ class TimesheetManager:
                 if self.today.to_date_string() not in self.data.columns:
                     self.data[self.today.to_date_string()] = 0
                 start_time = time.time()
+                # Save the state in case of crashes:
+                self.create_state(task_name, start_time)
                 # Start the UI logging time, once stopped through the UI, record the time
                 self.UI.timelogger(task_name)
                 self._end_task(task_name, start_time)
+
+    def start_task_from_state(self, task_name, start):
+        """
+        Starts recording time on the given task and then adds on previously recorded time.
+
+        ASSUMES TASK WAS CONTINUED CONTINUOUSLY FROM INITIAL START
+        # TODO: Allow resuming task on a different day
+        :param task_name: task to resume
+        :param start: old starting time
+        """
+        start = float(start)
+        self.UI.timelogger(task_name, start)
+        self._end_task(task_name, start)
 
     def _end_task(self, name, start_time):
         """
@@ -389,13 +441,12 @@ class TimesheetManager:
         :param name: task to record
         """
         self.UI.banner()
-        # Is setting a copy warning
-        # self.data[self.today.to_date_string()].loc[name] += int(time.time() - start_time)  # do not care about ms
         self.data.at[name, self.today.to_date_string()] += int(time.time() - start_time)  # do not care about ms
         print("Logging of Task '{}' stopped...".format(name))
         self.save_timesheet(self.path, self.name, self.data)
         print("Time successfully recorded!")
-        self.UI.user_return()
+        self.delete_state()
+        self.UI.user_return()  # TODO: Why does this not happen when reloading from state?
 
     def add_workday(self):
         """

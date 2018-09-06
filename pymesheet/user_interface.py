@@ -3,7 +3,7 @@ User interface for the Timesheet class
 Command line user interface for ease of use of logging time and other functions.
 @author: John Berroa
 """
-import time, os, sys, re
+import time, os, sys, re, pendulum
 from pyfiglet import Figlet
 
 
@@ -353,15 +353,25 @@ class UserInterface:
 
     ################ Specific Functions ################
 
-    def timelogger(self, name):
+    def timelogger(self, name, resume=None):
         """
         Page for starting the logging of time.
         :param name: name of task
+        :param resume: whether to print information regarding a resumed task
         """
-        start_time = time.strftime("%H:%M:%S", time.localtime())  # may lose a second on loading time between functions
-        self.banner()
-        print("Logging time on {}, starting at {}.".format(name, start_time))
-        while input("\nPress ENTER to end logging...") != "": continue
+        if resume is not None:
+            original_time = pendulum.from_timestamp(resume, tz="Europe/Berlin").to_time_string()
+            start_time = time.strftime("%H:%M:%S", time.localtime())
+            self.banner()
+            print("[RESUME] Previous start time loaded for Task '{}', started at {}.".format(name, original_time))
+            print("\nLogging time continuing from {}.".format(start_time))
+            while input("\nPress ENTER to end logging...") != "": continue
+        else:
+            # may lose a second on loading time between functions
+            start_time = time.strftime("%H:%M:%S", time.localtime())
+            self.banner()
+            print("Logging time on '{}', starting at {}.".format(name, start_time))
+            while input("\nPress ENTER to end logging...") != "": continue
 
     def _check_date_validity(self, date):
         """
