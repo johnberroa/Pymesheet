@@ -8,8 +8,8 @@ import pandas as pd
 import pendulum, time, pickle, os
 from os.path import join as pathjoin
 from user_interface import UserInterface
-from time_utils import Converter, TimeCalculator
-from utils import get_current_week_days, generate_day_dict
+from utils.time_utils import Converter, TimeCalculator
+from utils.utils import get_current_week_days, generate_day_dict
 
 VERSION = "2.0"
 CONFIG_PATH = ".config"
