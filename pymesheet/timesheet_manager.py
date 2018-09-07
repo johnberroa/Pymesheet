@@ -11,7 +11,7 @@ from user_interface import UserInterface
 from time_utils import Converter, TimeCalculator
 from utils import get_current_week_days, generate_day_dict
 
-VERSION = "1.7"
+VERSION = "2.0"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
