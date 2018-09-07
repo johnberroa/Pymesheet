@@ -3,7 +3,7 @@ User interface for the Timesheet class
 Command line user interface for ease of use of logging time and other functions.
 @author: John Berroa
 """
-import time, os, sys, re
+import time, os, sys, re, pendulum
 from pyfiglet import Figlet
 
 
@@ -34,11 +34,11 @@ class UserInterface:
         """
         print("=" * 80)
 
-    def summary_divider(self):  # TODO >v1.0: Make it variable length based on the string it sits under
+    def summary_divider(self, text):
         """
         Prints a row of --- for a divider
         """
-        print("-" * 55)
+        print("-" * len(text))
 
     def banner(self):
         """
@@ -158,8 +158,10 @@ class UserInterface:
             print("2) Time per day:\n  -See how much time was worked on a specific day.")
             print("3) Time per Task per day:\n  -See how much time was worked for a specific task on a certain day.")
             print("4) Total time:\n  -Display the total amount of time worked.")
-            print("5) Help:\n  -Print this page.")
-            print("6) Return:\n  -Return to the main menu.")
+            print("5) Weekly Report:\n  -Display all task information and their corresponding times for the current "
+                  "work week.")
+            print("6) Help:\n  -Print this page.")
+            print("7) Return:\n  -Return to the main menu.")
             self.user_return()
 
     def ask_time_summaries_input(self):
@@ -173,8 +175,9 @@ class UserInterface:
         print("\t[2] Time per day...")
         print("\t[3] Time per Task per day...")
         print("\t[4] Total time")
-        print("\t[5] Help")
-        print("\t[6] Return")
+        print("\t[5] Weekly Report")
+        print("\t[6] Help")
+        print("\t[7] Return")
         selection = None
         while selection not in ["1", "2", "3", "4", "5", "6", "7"]:
             selection = input("\t...")
@@ -190,10 +193,12 @@ class UserInterface:
                 return selection, (task, day)
             elif selection == '4':  # total time
                 return selection, None
-            elif selection == '5':  # help
+            elif selection == '5':  # weekly report
+                return selection, None
+            elif selection == '6':  # help
                 self._help("summary")
                 return selection, None
-            elif selection == '6':  # return
+            elif selection == '7':  # return
                 return selection, None
 
     def ask_timesheet_management_input(self):
@@ -237,7 +242,7 @@ class UserInterface:
                 sheet = self._ask_what_string(default=True)
                 return selection, sheet
             elif selection == '7':  # Baseline
-                base = self._ask_what_string(baseline=True)
+                base = self._ask_for_baseline()
                 return selection, base
             elif selection == '8':  # workweek
                 workweek = self._ask_what_string(workweek=True)
@@ -288,7 +293,7 @@ class UserInterface:
         _ = input("\nPress ENTER to return...")
 
     def _ask_what_string(self, work=False, add=False, delete=False, load=False, remove=False, backup=False,
-                         create=False, default=False, summary=False, baseline=False, workweek=False):
+                         create=False, default=False, summary=False, workweek=False):
         """
         Asks for a task/sheet, and the prompt depends on the context.
         :param work: context for string output (task)
@@ -297,7 +302,6 @@ class UserInterface:
         :param load: context for string output (timesheet)
         :param remove: context for string output (timesheet)
         :param backup: context for string output (timesheet)
-        :param baseline: context for string output (timesheet)
         :param workweek: context for string output (timesheet)
         :return: task name
         """
@@ -320,13 +324,21 @@ class UserInterface:
             string = input("What Timesheet will be the default?\n\t...")
         elif summary:
             string = input("Which Task do you want to summarize?\n\t...")
-        elif baseline:
-            string = input("The baseline is how much time was worked before starting to use the Timesheet Manager.\n"
-                           "This time will be added onto the total time to get an accurate image of how much work has\n"
-                           "been completed.\n\nInput time worked in the following format: xxdxxhxxm\n...")
         elif workweek:
             string = input("How many hours is a workweek for Timesheet '{}'?...".format(self.name))
         return string
+
+    def _ask_for_baseline(self):
+        BASELINE_REGEX = r"\d{2}d\d{2}h\d{2}m"
+        self.banner()
+        baseline = ""
+        valid = False
+        while not re.match(BASELINE_REGEX, baseline) and valid == False:
+            baseline = input("The baseline is how much time was worked before starting to use the Timesheet Manager.\n"
+                             "This time will be added onto the total time to get an accurate image of how much work has\n"
+                             "been completed.\n\nInput time worked in the following format: xxdxxhxxm\n...")
+            print()
+        return baseline
 
     def _ask_for_day(self):
         DATE_REGEX = r"^\d{4}-\d{2}-\d{2}$"
@@ -342,19 +354,32 @@ class UserInterface:
                             "2. Today\n\t"
                             "3. Yesterday\n\t...")
                 valid = self._check_date_validity(day)
+                print()
+            if day == "":
+                break
         return day
 
     ################ Specific Functions ################
 
-    def timelogger(self, name):
+    def timelogger(self, name, resume=None):
         """
         Page for starting the logging of time.
         :param name: name of task
+        :param resume: whether to print information regarding a resumed task
         """
-        start_time = time.strftime("%H:%M:%S", time.localtime())  # may lose a second on loading time between functions
-        self.banner()
-        print("Logging time on {}, starting at {}.".format(name, start_time))
-        while input("\nPress ENTER to end logging...") != "": continue
+        if resume is not None:
+            original_time = pendulum.from_timestamp(resume, tz="Europe/Berlin").to_time_string()
+            start_time = time.strftime("%H:%M:%S", time.localtime())
+            self.banner()
+            print("[RESUME] Previous start time loaded for Task '{}', started at {}.".format(name, original_time))
+            print("\nLogging time continuing from {}.".format(start_time))
+            while input("\nPress ENTER to end logging...") != "": continue
+        else:
+            # may lose a second on loading time between functions
+            start_time = time.strftime("%H:%M:%S", time.localtime())
+            self.banner()
+            print("Logging time on '{}', starting at {}.".format(name, start_time))
+            while input("\nPress ENTER to end logging...") != "": continue
 
     def _check_date_validity(self, date):
         """

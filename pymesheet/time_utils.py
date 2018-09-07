@@ -56,6 +56,25 @@ class Converter:
         else:
             return "{} days, {} hours".format(days, hours)
 
+    @staticmethod
+    def convert_int2day(number):
+        if number == 0:
+            return "Sunday"
+        elif number == 1:
+            return "Monday"
+        elif number == 2:
+            return "Tuesday"
+        elif number == 3:
+            return "Wednesday"
+        elif number == 4:
+            return "Thursday"
+        elif number == 5:
+            return "Friday"
+        elif number == 6:
+            return "Saturday"
+        else:
+            raise ValueError("Invalid integer input (0-6 allowed, input={})".format(number))
+
 
 class TimeCalculator:
     """
