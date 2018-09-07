@@ -14,18 +14,12 @@ def test_workday(end, start, task1, task2, total, worktime, workday, final):
 
 def add_workday(end, start, task1, task2, total):
     work_time = end - start
-    print("WT", work_time)
     allocated_time = []
     for task in [task1, task2]:
         allocated_time.append(task)
-    print("AC", sum(allocated_time))
     workday = work_time - sum(allocated_time)
-    print("WD", workday)
     if workday < 0:
-        print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
-        print("[DEBUG] workday={}, worktime={}".format(workday, work_time))
+        raise ValueError
     else:
         total += int(workday)
-        print("T", total)
-    print()
     return work_time, workday, total
