@@ -242,7 +242,7 @@ class UserInterface:
                 sheet = self._ask_what_string(default=True)
                 return selection, sheet
             elif selection == '7':  # Baseline
-                base = self._ask_what_string(baseline=True)
+                base = self._ask_for_baseline()
                 return selection, base
             elif selection == '8':  # workweek
                 workweek = self._ask_what_string(workweek=True)
@@ -293,7 +293,7 @@ class UserInterface:
         _ = input("\nPress ENTER to return...")
 
     def _ask_what_string(self, work=False, add=False, delete=False, load=False, remove=False, backup=False,
-                         create=False, default=False, summary=False, baseline=False, workweek=False):
+                         create=False, default=False, summary=False, workweek=False):
         """
         Asks for a task/sheet, and the prompt depends on the context.
         :param work: context for string output (task)
@@ -302,7 +302,6 @@ class UserInterface:
         :param load: context for string output (timesheet)
         :param remove: context for string output (timesheet)
         :param backup: context for string output (timesheet)
-        :param baseline: context for string output (timesheet)
         :param workweek: context for string output (timesheet)
         :return: task name
         """
@@ -325,13 +324,21 @@ class UserInterface:
             string = input("What Timesheet will be the default?\n\t...")
         elif summary:
             string = input("Which Task do you want to summarize?\n\t...")
-        elif baseline:
-            string = input("The baseline is how much time was worked before starting to use the Timesheet Manager.\n"
-                           "This time will be added onto the total time to get an accurate image of how much work has\n"
-                           "been completed.\n\nInput time worked in the following format: xxdxxhxxm\n...")
         elif workweek:
             string = input("How many hours is a workweek for Timesheet '{}'?...".format(self.name))
         return string
+
+    def _ask_for_baseline(self):
+        BASELINE_REGEX = r"\d{2}d\d{2}h\d{2}m"
+        self.banner()
+        baseline = ""
+        valid = False
+        while not re.match(BASELINE_REGEX, baseline) and valid == False:
+            baseline = input("The baseline is how much time was worked before starting to use the Timesheet Manager.\n"
+                             "This time will be added onto the total time to get an accurate image of how much work has\n"
+                             "been completed.\n\nInput time worked in the following format: xxdxxhxxm\n...")
+            print()
+        return baseline
 
     def _ask_for_day(self):
         DATE_REGEX = r"^\d{4}-\d{2}-\d{2}$"
@@ -347,6 +354,7 @@ class UserInterface:
                             "2. Today\n\t"
                             "3. Yesterday\n\t...")
                 valid = self._check_date_validity(day)
+                print()
             if day == "":
                 break
         return day

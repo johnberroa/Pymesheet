@@ -11,13 +11,14 @@ from user_interface import UserInterface
 from time_utils import Converter, TimeCalculator
 from utils import get_current_week_days, generate_day_dict
 
-VERSION = "1.3"
+VERSION = "1.7"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
 
-# TODO v>1.0: save state between recordings...have temp file created when active recording, deleted when not
-# TODO on start, if this file exists, load it up and start that task again
+# TODO: Feature idea if a task is no longer used, can export the times to the baseline then delete it from the task list
+# TODO: Feature idea: export formatted reports (maybe csvs that are human readable) (does go against privacy principle
+# TODO: though
 def clear():
     """
     Global function that clears the command line
@@ -34,9 +35,7 @@ class TimesheetManager:
         if "config.data" not in os.listdir(CONFIG_PATH):  # TODO: Does this work?
             self.create_config()
         default, tz = self.load_config()
-        print(default, type(tz))
         self.tz = tz
-        print(self.tz)
         if name is None:
             if default != "":
                 name = default
@@ -58,10 +57,10 @@ class TimesheetManager:
             self.data = pd.DataFrame(index=self.tasks)
         self.init_configs()
         self.working_start = None
+        self.work_day_tasks = []
         self.UI = UserInterface(name, new, self.today, VERSION)
 
         if ".state" in os.listdir(STATE_PATH):
-            print("[DEBUG] Saved STATE found!")
             task, start = self.load_state()
             self.start_task_from_state(task, start)
 
@@ -139,6 +138,7 @@ class TimesheetManager:
             path = pathjoin(self.path, "{}.pkl".format(name))
             if not only_data:
                 self.name = name
+                self.working_start = None
                 self.UI = UserInterface(name, False, self.today, VERSION)
                 self.init_configs()
             return pickle.load(open(path, "rb"))
@@ -211,7 +211,8 @@ class TimesheetManager:
                 self.tasks = None
                 self.data = pd.DataFrame(index=self.tasks)
                 self.UI = UserInterface(name, new, self.today, VERSION)
-                self.start_time = 0
+                self.working_start = None
+                self.init_configs()
                 print("New Timesheet with the name '{}' loaded.".format(name))
                 self.UI.user_return()
 
@@ -285,10 +286,10 @@ class TimesheetManager:
         self.UI.banner()
         with open(pathjoin(CONFIG_PATH, "config.data"), "r") as config:
             lines = config.readlines()
-        with open(pathjoin(CONFIG_PATH, "config.data"), 'r+') as config:
+        with open(pathjoin(CONFIG_PATH, "config.data"), 'w') as config:
             config.seek(0)  # rewind
-            config.write("default_timesheet={}\n".format(default))  # write the new line before
-            for line in lines[1:]:
+            config.write("default_timesheet={}\n".format(default))  # write the new line
+            for line in lines[1:]:  # paste all future lines
                 config.write(line)
         print("'{}' set as default Timesheet.".format(default))
         self.UI.user_return()
@@ -299,8 +300,7 @@ class TimesheetManager:
         Format:
         [NAME]
         workweek=40
-        baseline=23
-        h17m
+        baseline=23h17m
 
         [NAME]
         workweek=
@@ -378,7 +378,7 @@ class TimesheetManager:
         Just a function to help keep the code clean since this will appear multiple times.
         """
         try:
-            workweek, baseline = self.load_config_timesheet()  # TODO: Bugfix, this will not reset baseline when creating a new timesheet frmo a timesheet with a baseline
+            workweek, baseline = self.load_config_timesheet()
             if workweek != "":
                 self.workweek = int(workweek)
             else:
@@ -446,7 +446,11 @@ class TimesheetManager:
         self.save_timesheet(self.path, self.name, self.data)
         print("Time successfully recorded!")
         self.delete_state()
-        self.UI.user_return()  # TODO: Why does this not happen when reloading from state?
+        if self.working_start:
+            if name != "General":
+                self.work_day_tasks.append(name)
+        self.UI.user_return()
+        self.UI.banner()
 
     def add_workday(self):
         """
@@ -459,28 +463,30 @@ class TimesheetManager:
         if "General" not in self.data.index:
             print("No Task exists to log general work time...creating Task 'General'")
             self.add_task("General")
-        already_workday_time = self.data.at["General", self.today.to_date_string()]
-        allocated_time = self.data[self.today.to_date_string()].sum()
-        workday = (work_time + already_workday_time) - allocated_time
+        allocated_time = []
+        for task in self.work_day_tasks:
+            allocated_time.append(self.data[self.today.to_date_string()].loc[task])
+        workday = work_time - sum(allocated_time)
+        self.work_day_tasks = []
+        self.working_start = None
         if workday < 0:
             print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
-            print("[DEBUG]", workday)
+            print("[DEBUG] workday={}, worktime={}".format(workday, work_time))
             self.UI.user_return()
         else:
             self.UI.banner()
-            self.data.at["General", self.today.to_date_string()] = int(workday)  # do not care about ms
+            self.data.at["General", self.today.to_date_string()] += int(workday)  # do not care about ms
             work_time_mins = Converter.sec2min(work_time)
             work_time_hours, work_time_mins = Converter.min2hour(work_time_mins)
             work_hour_min_string = Converter.convert2string(int(work_time_hours), int(work_time_mins))
             general = self.data.at["General", self.today.to_date_string()]
             mins = Converter.sec2min(general)
-            hours, mins = Converter.min2hour(mins)  # TODO: This section still needs testing (official)
+            hours, mins = Converter.min2hour(mins)
             hour_min_string = Converter.convert2string(int(hours), int(mins))
             print("Total hours accumulated during the work day: {}".format(work_hour_min_string))
             print("Total hours set as general tasks: {}".format(hour_min_string))
             print("\nWork day ended!")
             self.save_timesheet(self.path, self.name, self.data)
-            self.working_start = None
             self.UI.user_return()
 
     ################ Task Functions ################
@@ -664,7 +670,7 @@ class TimesheetManager:
             else:
                 print(hour_min_string)
             print(day_hour_min_string)
-            if self.baseline != "":  # TODO v>1.0: make it regex safe
+            if self.baseline != "":
                 string = "Summary of all time worked including baseline:"
                 print("\n" + string)
                 self.UI.summary_divider(string)
@@ -680,12 +686,20 @@ class TimesheetManager:
     def weekly_report(self):
         self.UI.banner()
         workdays = get_current_week_days(self.today)
+        summable_days = workdays
         tasks = self.data.index
         report_data = generate_day_dict(workdays, tasks)
         # Fill up dictionary with data
+        deletable = []
         for day in workdays:
             for task in tasks:
-                report_data[day][task] = self.data[day].loc[task]
+                try:
+                    report_data[day][task] = self.data[day].loc[task]
+                except KeyError:
+                    report_data[day][task] = 0
+                    deletable.append(day)
+        for delete in set(deletable):  # to remove duplicates
+            summable_days.remove(delete)
         # Get max length of tasks so that spacing works out
         max_len = 0
         for task in tasks:
@@ -717,6 +731,31 @@ class TimesheetManager:
                         continue
                     else:
                         print("\t" + string + "\t{}".format(hour_min_string))
+
+        print("\n------------")
+        print("Weekly Total")
+        print("------------")
+        total = int(self.data[summable_days].sum().sum())
+        mins = Converter.sec2min(total)
+        hours, mins = Converter.min2hour(mins)
+        hour_min_string = Converter.convert2string(int(hours), int(mins))
+        days, hours_day = Converter.hour2day(hours)
+        day_hour_min_string = Converter.convert2string_days(int(days), int(hours_day), int(mins))
+        if days == 0:
+            if hours == 0:
+                print(hour_min_string.split(", ")[1])
+            else:
+                print(hour_min_string)
+        else:
+            print(hour_min_string)
+            print(day_hour_min_string)
+
+        if type(self.workweek) == int:
+            if hours > self.workweek:
+                print("Sufficient hours have been worked this week to meet the workweek requirements.")
+            else:
+                diff = self.workweek - hours
+                print("{} hours still need to be worked this week in order to meet workweek requirements.".format(diff))
         self.UI.user_return()
 
     ################ Debug Functions ################
