@@ -681,6 +681,8 @@ class TimesheetManager:
                 total_worked_hours = (back_days * 24) + back_hours + hours
                 print(Converter.convert2string(int(total_worked_hours), int(mins)))
                 print(Converter.convert2string_days(int(total_days), int(total_hours), int(total_mins)))
+            print("\nSince the creation of this Timesheet, {} individual days have been worked.".format(
+                len(self.data.columns.values)))
         self.UI.user_return()
 
     def weekly_report(self):
