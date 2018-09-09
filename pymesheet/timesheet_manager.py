@@ -8,10 +8,10 @@ import pandas as pd
 import pendulum, time, pickle, os
 from os.path import join as pathjoin
 from user_interface import UserInterface
-from time_utils import Converter, TimeCalculator
-from utils import get_current_week_days, generate_day_dict
+from utils.time_utils import Converter, TimeCalculator
+from utils.utils import get_current_week_days, generate_day_dict
 
-VERSION = "2.0"
+VERSION = "2.1"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
@@ -681,6 +681,8 @@ class TimesheetManager:
                 total_worked_hours = (back_days * 24) + back_hours + hours
                 print(Converter.convert2string(int(total_worked_hours), int(mins)))
                 print(Converter.convert2string_days(int(total_days), int(total_hours), int(total_mins)))
+            print("\nSince the creation of this Timesheet, {} individual days have been worked.".format(
+                len(self.data.columns.values)))
         self.UI.user_return()
 
     def weekly_report(self):
