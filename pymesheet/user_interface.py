@@ -101,7 +101,7 @@ class UserInterface:
             elif selection == '7':  # Quit
                 self.banner()
                 print("Exiting...")
-                sys.exit()
+                return selection, None
             elif selection.lower() == 'debug':  # Print the dataframe
                 self.banner()
                 return selection, ''

@@ -4,6 +4,7 @@ Creates a Pandas dataframe that records time worked on various user specified ta
 Connects to a user interface for ease of use.
 @author: John Berroa
 """
+import sys
 import pandas as pd
 import pendulum, time, pickle, os
 from os.path import join as pathjoin
@@ -11,11 +12,12 @@ from user_interface import UserInterface
 from utils.time_utils import Converter, TimeCalculator
 from utils.utils import get_current_week_days, generate_day_dict
 
-VERSION = "2.1"
+VERSION = "2.2"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
 
+# TODO: Add to the feature list that I added confirmation on quit when general is still running
 # TODO: Feature idea if a task is no longer used, can export the times to the baseline then delete it from the task list
 # TODO: Feature idea: export formatted reports (maybe csvs that are human readable) (does go against privacy principle
 # TODO: though
@@ -50,7 +52,7 @@ class TimesheetManager:
         self.today = pendulum.today(tz=self.tz)
         new = False
         try:
-            self.data = self.load_timesheet(self.name)
+            self.load_timesheet(self.name)
         except FileNotFoundError:
             new = True
             self.tasks = None
@@ -97,8 +99,7 @@ class TimesheetManager:
             elif code == '52':
                 self.create_new_timesheet(string)
             elif code == '53':
-                self.data = self.load_timesheet(string)
-                print("{} Timesheet loaded.".format(string))
+                self.load_timesheet(string)
                 self.UI.user_return()
             elif code == '54':
                 self.delete_timesheet(string)
@@ -112,6 +113,13 @@ class TimesheetManager:
                 self.set_baseline(string)
             elif code == '58':
                 self.set_workweek(string)
+            elif code == '7':
+                if self.working_start is not None:
+                    self.UI.banner()
+                    print("[WARNING] The workday is still running!  Please stop it before exiting.")
+                    self.UI.user_return()
+                else:
+                    sys.exit()
             elif code == 'debug':
                 self.debug()
 
@@ -137,11 +145,21 @@ class TimesheetManager:
         if name != "":
             path = pathjoin(self.path, "{}.pkl".format(name))
             if not only_data:
-                self.name = name
-                self.working_start = None
-                self.UI = UserInterface(name, False, self.today, VERSION)
-                self.init_configs()
-            return pickle.load(open(path, "rb"))
+                try:
+                    self.data = pickle.load(open(path, "rb"))
+                    self.name = name
+                    self.working_start = None
+                    self.UI = UserInterface(name, False, self.today, VERSION)
+                    self.init_configs()
+                    print("{} Timesheet loaded.".format(name))
+                except FileNotFoundError:
+                    self.UI.banner()
+                    print("Timesheet '{}' does not exist.".format(name))
+            else:
+                try:
+                    return pickle.load(open(path, "rb"))
+                except FileNotFoundError:
+                    print("[ERROR] Internal error on loading data from TS {}.  The file was not found".format(name))
 
     def delete_timesheet(self, name):
         """
