@@ -34,7 +34,7 @@ class TimesheetManager:
         self.path = pathjoin(path, "timesheets")
         os.makedirs(self.path, exist_ok=True)
         os.makedirs(CONFIG_PATH, exist_ok=True)
-        if "config.data" not in os.listdir(CONFIG_PATH):  # TODO: Does this work?
+        if "config.data" not in os.listdir(CONFIG_PATH):
             self.create_config()
         default, tz = self.load_config()
         self.tz = tz
@@ -62,7 +62,7 @@ class TimesheetManager:
         self.work_day_tasks = []
         self.UI = UserInterface(name, new, self.today, VERSION)
 
-        if ".state" in os.listdir(STATE_PATH):
+        if ".state-{}".format(name) in os.listdir(STATE_PATH):
             task, start = self.load_state()
             self.start_task_from_state(task, start)
 
@@ -152,6 +152,10 @@ class TimesheetManager:
                     self.UI = UserInterface(name, False, self.today, VERSION)
                     self.init_configs()
                     print("{} Timesheet loaded.".format(name))
+
+                    if ".state-{}".format(name) in os.listdir(STATE_PATH):
+                        task, start = self.load_state()
+                        self.start_task_from_state(task, start)
                 except FileNotFoundError:
                     self.UI.banner()
                     print("Timesheet '{}' does not exist.".format(name))
@@ -176,7 +180,7 @@ class TimesheetManager:
                     print("[WARNING] Deleting current Timesheet, new current Timesheet will be the default.")
                     _ = input("\nPress ENTER to continue...")
                     try:
-                        self.data = self.load_timesheet(self.load_config()[0])
+                        self.load_timesheet(self.load_config()[0])
                     except FileNotFoundError:
                         print("[WARNING] No default Timesheet set, creating a temporary...")
                         _ = input("\nPress ENTER to acknowledge...")
@@ -197,7 +201,7 @@ class TimesheetManager:
         i = 1  # need this because it will also pick up non .pkls if using enumerate
         for timesheet in os.listdir(self.path):
             if timesheet[-4:] == '.pkl':
-                print("\t({}) {}".format(i, timesheet))
+                print("\t({}) {}".format(i, timesheet.split('.')[0]))  # remove the .pkl extension in printing
                 i += 1
         self.UI.user_return()
 
@@ -219,7 +223,8 @@ class TimesheetManager:
         Creates a new timesheet with specified name
         :param name: Name of new timesheet
         """
-        if name in os.listdir(self.path):
+        self.UI.banner()
+        if "{}.pkl".format(name) in os.listdir(self.path):
             print("Timesheet '{}' already exists.".format(name))
             self.UI.user_return()
         else:
@@ -266,7 +271,7 @@ class TimesheetManager:
         :param task: task being recorded
         :param start: starting time of task
         """
-        with open(pathjoin(STATE_PATH, ".state"), "w") as state:
+        with open(pathjoin(STATE_PATH, ".state-{}".format(self.name)), "w") as state:
             state.write("{}={}".format(task, start))
 
     def load_state(self):
@@ -274,7 +279,7 @@ class TimesheetManager:
         Loads the information in the saved state file
         :return: the task and start time of the info in the file
         """
-        with open(pathjoin(STATE_PATH, ".state"), "r") as state:
+        with open(pathjoin(STATE_PATH, ".state-{}".format(self.name)), "r") as state:
             old = state.read().split("=")
             task = old[0]
             start = old[1]
@@ -284,7 +289,7 @@ class TimesheetManager:
         """
         Deletes the state file
         """
-        os.remove(pathjoin(STATE_PATH, ".state"))
+        os.remove(pathjoin(STATE_PATH, ".state-{}".format(self.name)))
 
     ################ Configuration Functions ################
 
@@ -448,6 +453,8 @@ class TimesheetManager:
         :param task_name: task to resume
         :param start: old starting time
         """
+        if self.today.to_date_string() not in self.data.columns:
+            self.data[self.today.to_date_string()] = 0
         start = float(start)
         self.UI.timelogger(task_name, start)
         self._end_task(task_name, start)
