@@ -12,7 +12,7 @@ from user_interface import UserInterface
 from utils.time_utils import Converter, TimeCalculator
 from utils.utils import get_current_week_days, generate_day_dict
 
-VERSION = "2.2"
+VERSION = "2.4"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
@@ -65,6 +65,8 @@ class TimesheetManager:
         if ".state-{}".format(name) in os.listdir(STATE_PATH):
             task, start = self.load_state()
             self.start_task_from_state(task, start)
+        if ".state-{}-workday".format(name) in os.listdir(STATE_PATH):
+            self.working_start, self.work_day_allocated = self.load_workday_state()
 
         while True:
             code, string = self.UI.ask_generic_input()
@@ -149,6 +151,7 @@ class TimesheetManager:
                     self.data = pickle.load(open(path, "rb"))
                     self.name = name
                     self.working_start = None
+                    self.work_day_allocated = 0
                     self.UI = UserInterface(name, False, self.today, VERSION)
                     self.init_configs()
                     print("{} Timesheet loaded.".format(name))
@@ -156,6 +159,8 @@ class TimesheetManager:
                     if ".state-{}".format(name) in os.listdir(STATE_PATH):
                         task, start = self.load_state()
                         self.start_task_from_state(task, start)
+                    if ".state-{}-workday".format(name) in os.listdir(STATE_PATH):
+                        self.working_start, self.work_day_allocated = self.load_workday_state()
                 except FileNotFoundError:
                     self.UI.banner()
                     print("Timesheet '{}' does not exist.".format(name))
@@ -273,6 +278,26 @@ class TimesheetManager:
         """
         with open(pathjoin(STATE_PATH, ".state-{}".format(self.name)), "w") as state:
             state.write("{}={}".format(task, start))
+
+    def create_workday_state(self):
+        """
+        Creates a hidden state file with the time the workday was started and also allocated time so the workday
+        can be started again in case of failure.  No need to check for existence since it will always be deleted on
+        startup.
+        """
+        with open(pathjoin(STATE_PATH, ".state-{}-workday".format(self.name)), "w") as state:
+            state.write("{}={}".format(self.working_start, self.work_day_allocated))
+
+    def load_workday_state(self):
+        """
+        Loads the workday information in the saved state file
+        :return: workday time and allocated time
+        """
+        with open(pathjoin(STATE_PATH, ".state-{}-workday".format(self.name)), "r") as state:
+            old = state.read().split("=")
+            workday = old[0]
+            allocated = old[1]
+        return workday, allocated
 
     def load_state(self):
         """
@@ -739,8 +764,10 @@ class TimesheetManager:
             day = pendulum.parse(day)
             print("{}, {}".format(Converter.convert_int2day(day.day_of_week), day_string[5:]))
             print("-" * 16)  # length of Wednesday string
+            values = []
             for task in tasks:
                 value = report_data[day_string][task]
+                values.append(value)
                 if value != 0:
                     mins = Converter.sec2min(value)
                     hours, mins = Converter.min2hour(mins)
@@ -756,6 +783,18 @@ class TimesheetManager:
                         continue
                     else:
                         print("\t" + string + "\t{}".format(hour_min_string))
+
+            value = sum(values)  # Daily sums
+            mins = Converter.sec2min(value)
+            hours, mins = Converter.min2hour(mins)
+            hour_min_string = Converter.convert2string(int(hours), int(mins))
+            if hours == 0 and mins != 0:
+                hour_min_string = hour_min_string.split(", ")[1]
+                print("\n\tDaily Total:\t\t{}\n".format(hour_min_string))
+            elif hours == 0 and mins == 0:
+                continue
+            else:
+                print("\n\tDaily Total:\t\t{}\n".format(hour_min_string))
 
         print("\n------------")
         print("Weekly Total")
