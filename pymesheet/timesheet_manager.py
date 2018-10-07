@@ -59,7 +59,7 @@ class TimesheetManager:
             self.data = pd.DataFrame(index=self.tasks)
         self.init_configs()
         self.working_start = None
-        self.work_day_tasks = []
+        self.work_day_allocated = 0
         self.UI = UserInterface(name, new, self.today, VERSION)
 
         if ".state-{}".format(name) in os.listdir(STATE_PATH):
@@ -466,14 +466,15 @@ class TimesheetManager:
         :param name: task to record
         """
         self.UI.banner()
-        self.data.at[name, self.today.to_date_string()] += int(time.time() - start_time)  # do not care about ms
+        time_worked = int(time.time() - start_time)  # do not care about ms
+        self.data.at[name, self.today.to_date_string()] += time_worked
         print("Logging of Task '{}' stopped...".format(name))
         self.save_timesheet(self.path, self.name, self.data)
         print("Time successfully recorded!")
         self.delete_state()
         if self.working_start:
             if name != "General":
-                self.work_day_tasks.append(name)
+                self.work_day_allocated += time_worked
         self.UI.user_return()
         self.UI.banner()
 
@@ -488,11 +489,8 @@ class TimesheetManager:
         if "General" not in self.data.index:
             print("No Task exists to log general work time...creating Task 'General'")
             self.add_task("General")
-        allocated_time = []
-        for task in self.work_day_tasks:
-            allocated_time.append(self.data[self.today.to_date_string()].loc[task])
-        workday = work_time - sum(allocated_time)
-        self.work_day_tasks = []
+        workday = work_time - self.work_day_allocated
+        self.work_day_allocated = 0
         self.working_start = None
         if workday < 0:
             print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
@@ -564,7 +562,7 @@ class TimesheetManager:
             print("Task '{}' successfully deleted.".format(task_name))
             self.UI.user_return()
 
-    ################ Time Functions ################
+    ################ Time Functions ################  #TODO: Printing when only seconds are there
 
     def time_per_day(self, day):
         """
