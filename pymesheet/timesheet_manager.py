@@ -7,6 +7,7 @@ Connects to a user interface for ease of use.
 import sys
 import pandas as pd
 import pendulum, time, pickle, os
+from shutil import copyfile
 from os.path import join as pathjoin
 from user_interface import UserInterface
 from utils.time_utils import Converter, TimeCalculator
@@ -220,6 +221,12 @@ class TimesheetManager:
         os.makedirs(path, exist_ok=True)
         data = self.load_timesheet(name, only_data=True)
         self.save_timesheet(path, name, data)
+
+        if "{}-config.data".format(self.name) in os.listdir(CONFIG_PATH):
+            os.makedirs(pathjoin(path, ".config"), exist_ok=True)
+            copyfile(pathjoin(CONFIG_PATH, "{}-config.data".format(self.name)),
+                     pathjoin(path, ".config", "{}-config.data".format(self.name)))
+
         print("'{}' successfully backed up.".format(name))
         self.UI.user_return()
 
