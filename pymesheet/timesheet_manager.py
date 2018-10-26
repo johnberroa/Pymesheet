@@ -4,14 +4,16 @@ Creates a Pandas dataframe that records time worked on various user specified ta
 Connects to a user interface for ease of use.
 @author: John Berroa
 """
+import sys
 import pandas as pd
 import pendulum, time, pickle, os
+from shutil import copyfile
 from os.path import join as pathjoin
 from user_interface import UserInterface
-from utils.time_utils import Converter, TimeCalculator
-from utils.utils import get_current_week_days, generate_day_dict
+from utilities.time_utils import Converter, TimeCalculator
+from utilities.utils import get_current_week_days, generate_day_dict
 
-VERSION = "2.1"
+VERSION = "3.0"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
@@ -32,7 +34,7 @@ class TimesheetManager:
         self.path = pathjoin(path, "timesheets")
         os.makedirs(self.path, exist_ok=True)
         os.makedirs(CONFIG_PATH, exist_ok=True)
-        if "config.data" not in os.listdir(CONFIG_PATH):  # TODO: Does this work?
+        if "config.data" not in os.listdir(CONFIG_PATH):
             self.create_config()
         default, tz = self.load_config()
         self.tz = tz
@@ -49,20 +51,27 @@ class TimesheetManager:
         self.name = name
         self.today = pendulum.today(tz=self.tz)
         new = False
-        try:
-            self.data = self.load_timesheet(self.name)
-        except FileNotFoundError:
+        loaded = self.load_timesheet(self.name)
+        if not loaded:
+            clear()
+            print("[SETUP] The current default Timesheet does not exist.\nA temporary Timesheet will be created.")
+            print("\nPlease change your default timesheet in the 'Timesheet Management' menu.")
+            _ = input("\nPress ENTER to continue...")
+            name = "TEMPORARY"
             new = True
             self.tasks = None
             self.data = pd.DataFrame(index=self.tasks)
         self.init_configs()
         self.working_start = None
-        self.work_day_tasks = []
+        self.work_day_allocated = 0
         self.UI = UserInterface(name, new, self.today, VERSION)
 
-        if ".state" in os.listdir(STATE_PATH):
+        if ".state-{}".format(name) in os.listdir(STATE_PATH):
             task, start = self.load_state()
             self.start_task_from_state(task, start)
+        if ".state-{}-workday".format(name) in os.listdir(STATE_PATH):
+            self.working_start, self.work_day_allocated = self.load_workday_state()
+            self.UI.working = True
 
         while True:
             code, string = self.UI.ask_generic_input()
@@ -71,7 +80,7 @@ class TimesheetManager:
                 self.start_task(string)
             elif code == '2':
                 if string == 'start':
-                    self.working_start = time.time()
+                    self.start_workday()
                 else:
                     self.add_workday()
             elif code == '31':
@@ -97,8 +106,9 @@ class TimesheetManager:
             elif code == '52':
                 self.create_new_timesheet(string)
             elif code == '53':
-                self.data = self.load_timesheet(string)
-                print("{} Timesheet loaded.".format(string))
+                loaded = self.load_timesheet(string)
+                if not loaded:
+                    print("Timesheet '{}' does not exist.".format(name))
                 self.UI.user_return()
             elif code == '54':
                 self.delete_timesheet(string)
@@ -112,6 +122,13 @@ class TimesheetManager:
                 self.set_baseline(string)
             elif code == '58':
                 self.set_workweek(string)
+            elif code == '7':
+                if self.working_start is not None:
+                    self.UI.banner()
+                    print("[WARNING] The workday is still running!  Please stop it before exiting.")
+                    self.UI.user_return()
+                else:
+                    sys.exit()
             elif code == 'debug':
                 self.debug()
 
@@ -133,15 +150,33 @@ class TimesheetManager:
         """
         Loads a timesheet and sets all the parameters of this class to deal with the new timesheet
         :param name: name of Timesheet
+        :return: False if file not found error, True if loaded, or data if asking for data
         """
         if name != "":
             path = pathjoin(self.path, "{}.pkl".format(name))
             if not only_data:
-                self.name = name
-                self.working_start = None
-                self.UI = UserInterface(name, False, self.today, VERSION)
-                self.init_configs()
-            return pickle.load(open(path, "rb"))
+                try:
+                    self.data = pickle.load(open(path, "rb"))
+                    self.name = name
+                    self.working_start = None
+                    self.work_day_allocated = 0
+                    self.UI = UserInterface(name, False, self.today, VERSION)
+                    self.init_configs()
+                    print("{} Timesheet loaded.".format(name))
+
+                    if ".state-{}".format(name) in os.listdir(STATE_PATH):
+                        task, start = self.load_state()
+                        self.start_task_from_state(task, start)
+                    if ".state-{}-workday".format(name) in os.listdir(STATE_PATH):
+                        self.working_start, self.work_day_allocated = self.load_workday_state()
+                except FileNotFoundError:
+                    return False
+            else:
+                try:
+                    return pickle.load(open(path, "rb"))
+                except FileNotFoundError:
+                    return False
+        return True
 
     def delete_timesheet(self, name):
         """
@@ -154,18 +189,23 @@ class TimesheetManager:
             while decision not in ["y", "n"]:
                 decision = input("[WARNING] Confirm DELETION of Timesheet '{}' [y/n]: ".format(name)).lower()
             if decision == "y":
-                if name == self.name:
-                    print("[WARNING] Deleting current Timesheet, new current Timesheet will be the default.")
-                    _ = input("\nPress ENTER to continue...")
-                    try:
-                        self.data = self.load_timesheet(self.load_config()[0])
-                    except FileNotFoundError:
-                        print("[WARNING] No default Timesheet set, creating a temporary...")
-                        _ = input("\nPress ENTER to acknowledge...")
-                        self.create_new_timesheet("TEMPORARY")
-                os.remove(pathjoin(self.path, name + ".pkl"))
-                print("'{}' deleted.".format(name))
-                self.UI.user_return()
+                if "{}.pkl".format(name) in os.listdir(self.path):
+                    if name == self.name:
+                        os.remove(pathjoin(self.path, name + ".pkl"))
+                        print("[WARNING] Deleting current Timesheet, new current Timesheet will be the default.")
+                        _ = input("\nPress ENTER to continue...")
+                        loaded = self.load_timesheet(self.load_config()[0])
+                        if not loaded:
+                            self.UI.banner()
+                            print("[WARNING] No default Timesheet set, creating a temporary...")
+                            _ = input("\nPress ENTER to acknowledge...")
+                            self.create_new_timesheet("TEMPORARY")
+                    self.UI.banner()
+                    print("'{}' deleted.".format(name))
+                    self.UI.user_return()
+                else:
+                    print("There exists no Timesheet with the name '{}'.".format(name))
+                    self.UI.user_return()
             else:
                 print("'{}' not deleted.".format(name))
                 self.UI.user_return()
@@ -179,7 +219,7 @@ class TimesheetManager:
         i = 1  # need this because it will also pick up non .pkls if using enumerate
         for timesheet in os.listdir(self.path):
             if timesheet[-4:] == '.pkl':
-                print("\t({}) {}".format(i, timesheet))
+                print("\t({}) {}".format(i, timesheet.split('.')[0]))  # remove the .pkl extension in printing
                 i += 1
         self.UI.user_return()
 
@@ -192,8 +232,17 @@ class TimesheetManager:
         path = pathjoin(self.path, ".backup")
         os.makedirs(path, exist_ok=True)
         data = self.load_timesheet(name, only_data=True)
-        self.save_timesheet(path, name, data)
-        print("'{}' successfully backed up.".format(name))
+        if not data:
+            print("Timesheet '{}' does not exist.".format(name))
+        else:
+            self.save_timesheet(path, name, data)
+
+            if "{}-config.data".format(self.name) in os.listdir(CONFIG_PATH):
+                os.makedirs(pathjoin(path, ".config"), exist_ok=True)
+                copyfile(pathjoin(CONFIG_PATH, "{}-config.data".format(self.name)),
+                         pathjoin(path, ".config", "{}-config.data".format(self.name)))
+
+            print("'{}' successfully backed up.".format(name))
         self.UI.user_return()
 
     def create_new_timesheet(self, name):
@@ -201,7 +250,8 @@ class TimesheetManager:
         Creates a new timesheet with specified name
         :param name: Name of new timesheet
         """
-        if name in os.listdir(self.path):
+        self.UI.banner()
+        if "{}.pkl".format(name) in os.listdir(self.path):
             print("Timesheet '{}' already exists.".format(name))
             self.UI.user_return()
         else:
@@ -248,25 +298,51 @@ class TimesheetManager:
         :param task: task being recorded
         :param start: starting time of task
         """
-        with open(pathjoin(STATE_PATH, ".state"), "w") as state:
+        with open(pathjoin(STATE_PATH, ".state-{}".format(self.name)), "w") as state:
             state.write("{}={}".format(task, start))
+
+    def create_workday_state(self):
+        """
+        Creates a hidden state file with the time the workday was started and also allocated time so the workday
+        can be started again in case of failure.  No need to check for existence since it will always be deleted on
+        startup.
+        """
+        with open(pathjoin(STATE_PATH, ".state-{}-workday".format(self.name)), "w") as state:
+            state.write("{}={}".format(self.working_start, self.work_day_allocated))
+
+    def load_workday_state(self):
+        """
+        Loads the workday information in the saved state file
+        :return: workday time and allocated time
+        """
+        with open(pathjoin(STATE_PATH, ".state-{}-workday".format(self.name)), "r") as state:
+            old = state.read().split("=")
+            workday = float(old[0])
+            allocated = float(old[1])
+        return workday, allocated
 
     def load_state(self):
         """
         Loads the information in the saved state file
         :return: the task and start time of the info in the file
         """
-        with open(pathjoin(STATE_PATH, ".state"), "r") as state:
+        with open(pathjoin(STATE_PATH, ".state-{}".format(self.name)), "r") as state:
             old = state.read().split("=")
             task = old[0]
-            start = old[1]
+            start = float(old[1])
         return task, start
 
     def delete_state(self):
         """
         Deletes the state file
         """
-        os.remove(pathjoin(STATE_PATH, ".state"))
+        os.remove(pathjoin(STATE_PATH, ".state-{}".format(self.name)))
+
+    def delete_workday_state(self):
+        """
+        Deletes the workday state file
+        """
+        os.remove(pathjoin(STATE_PATH, ".state-{}-workday".format(self.name)))
 
     ################ Configuration Functions ################
 
@@ -430,7 +506,8 @@ class TimesheetManager:
         :param task_name: task to resume
         :param start: old starting time
         """
-        start = float(start)
+        if self.today.to_date_string() not in self.data.columns:
+            self.data[self.today.to_date_string()] = 0
         self.UI.timelogger(task_name, start)
         self._end_task(task_name, start)
 
@@ -441,16 +518,25 @@ class TimesheetManager:
         :param name: task to record
         """
         self.UI.banner()
-        self.data.at[name, self.today.to_date_string()] += int(time.time() - start_time)  # do not care about ms
+        time_worked = int(time.time() - start_time)  # do not care about ms
+        self.data.at[name, self.today.to_date_string()] += time_worked
         print("Logging of Task '{}' stopped...".format(name))
         self.save_timesheet(self.path, self.name, self.data)
         print("Time successfully recorded!")
         self.delete_state()
         if self.working_start:
             if name != "General":
-                self.work_day_tasks.append(name)
+                self.work_day_allocated += time_worked
+                self.create_workday_state()
         self.UI.user_return()
         self.UI.banner()
+
+    def start_workday(self):
+        """
+        Starts recording all time until deactivated.
+        """
+        self.working_start = time.time()
+        self.create_workday_state()
 
     def add_workday(self):
         """
@@ -463,12 +549,10 @@ class TimesheetManager:
         if "General" not in self.data.index:
             print("No Task exists to log general work time...creating Task 'General'")
             self.add_task("General")
-        allocated_time = []
-        for task in self.work_day_tasks:
-            allocated_time.append(self.data[self.today.to_date_string()].loc[task])
-        workday = work_time - sum(allocated_time)
-        self.work_day_tasks = []
+        workday = work_time - self.work_day_allocated
+        self.work_day_allocated = 0
         self.working_start = None
+        self.delete_workday_state()
         if workday < 0:
             print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
             print("[DEBUG] workday={}, worktime={}".format(workday, work_time))
@@ -479,12 +563,11 @@ class TimesheetManager:
             work_time_mins = Converter.sec2min(work_time)
             work_time_hours, work_time_mins = Converter.min2hour(work_time_mins)
             work_hour_min_string = Converter.convert2string(int(work_time_hours), int(work_time_mins))
-            general = self.data.at["General", self.today.to_date_string()]
-            mins = Converter.sec2min(general)
+            mins = Converter.sec2min(workday)
             hours, mins = Converter.min2hour(mins)
             hour_min_string = Converter.convert2string(int(hours), int(mins))
-            print("Total hours accumulated during the work day: {}".format(work_hour_min_string))
-            print("Total hours set as general tasks: {}".format(hour_min_string))
+            print("Total hours accumulated during the this work day: {}".format(work_hour_min_string))
+            print("Total hours set as general tasks during this period: {}".format(hour_min_string))
             print("\nWork day ended!")
             self.save_timesheet(self.path, self.name, self.data)
             self.UI.user_return()
@@ -539,7 +622,7 @@ class TimesheetManager:
             print("Task '{}' successfully deleted.".format(task_name))
             self.UI.user_return()
 
-    ################ Time Functions ################
+    ################ Time Functions ################  #TODO: Printing when only seconds are there
 
     def time_per_day(self, day):
         """
@@ -666,7 +749,10 @@ class TimesheetManager:
             print(string)
             self.UI.summary_divider(string)
             if hours == 0:
-                print(hour_min_string.split(", ")[1])
+                try:
+                    print(hour_min_string.split(", ")[1])
+                except:
+                    print("Less than a minute.")
             else:
                 print(hour_min_string)
             print(day_hour_min_string)
@@ -716,8 +802,10 @@ class TimesheetManager:
             day = pendulum.parse(day)
             print("{}, {}".format(Converter.convert_int2day(day.day_of_week), day_string[5:]))
             print("-" * 16)  # length of Wednesday string
+            values = []
             for task in tasks:
                 value = report_data[day_string][task]
+                values.append(value)
                 if value != 0:
                     mins = Converter.sec2min(value)
                     hours, mins = Converter.min2hour(mins)
@@ -733,6 +821,18 @@ class TimesheetManager:
                         continue
                     else:
                         print("\t" + string + "\t{}".format(hour_min_string))
+
+            value = sum(values)  # Daily sums
+            mins = Converter.sec2min(value)
+            hours, mins = Converter.min2hour(mins)
+            hour_min_string = Converter.convert2string(int(hours), int(mins))
+            if hours == 0 and mins != 0:
+                hour_min_string = hour_min_string.split(", ")[1]
+                print("\n\tDaily Total:\t\t{}\n".format(hour_min_string))
+            elif hours == 0 and mins == 0:
+                continue
+            else:
+                print("\n\tDaily Total:\t\t{}\n".format(hour_min_string))
 
         print("\n------------")
         print("Weekly Total")

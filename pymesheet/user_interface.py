@@ -36,7 +36,7 @@ class UserInterface:
 
     def summary_divider(self, text):
         """
-        Prints a row of --- for a divider
+        Prints a row of --- for a divider with specified length
         """
         print("-" * len(text))
 
@@ -101,7 +101,7 @@ class UserInterface:
             elif selection == '7':  # Quit
                 self.banner()
                 print("Exiting...")
-                sys.exit()
+                return selection, None
             elif selection.lower() == 'debug':  # Print the dataframe
                 self.banner()
                 return selection, ''
