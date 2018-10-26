@@ -13,7 +13,7 @@ from user_interface import UserInterface
 from utilities.time_utils import Converter, TimeCalculator
 from utilities.utils import get_current_week_days, generate_day_dict
 
-VERSION = "3.0"
+VERSION = "3.0.1"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
@@ -181,6 +181,7 @@ class TimesheetManager:
     def delete_timesheet(self, name):
         """
         Deletes a timesheet.  Has a confirmation to make sure a file isn't deleted when not wanted to
+        Will not delete backups!  This is a safety feature.
         :param name: name of timesheet to delete
         """
         self.UI.banner()
@@ -232,7 +233,7 @@ class TimesheetManager:
         path = pathjoin(self.path, ".backup")
         os.makedirs(path, exist_ok=True)
         data = self.load_timesheet(name, only_data=True)
-        if not data:
+        if type(data) == bool:
             print("Timesheet '{}' does not exist.".format(name))
         else:
             self.save_timesheet(path, name, data)
