@@ -13,12 +13,11 @@ from user_interface import UserInterface
 from utilities.time_utils import Converter, TimeCalculator
 from utilities.utils import get_current_week_days, generate_day_dict
 
-VERSION = "2.6"
+VERSION = "3.0"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
 
-# TODO: Add to the feature list that I added confirmation on quit when general is still running
 # TODO: Feature idea if a task is no longer used, can export the times to the baseline then delete it from the task list
 # TODO: Feature idea: export formatted reports (maybe csvs that are human readable) (does go against privacy principle
 # TODO: though
@@ -750,7 +749,10 @@ class TimesheetManager:
             print(string)
             self.UI.summary_divider(string)
             if hours == 0:
-                print(hour_min_string.split(", ")[1])
+                try:
+                    print(hour_min_string.split(", ")[1])
+                except:
+                    print("Less than a minute.")
             else:
                 print(hour_min_string)
             print(day_hour_min_string)
