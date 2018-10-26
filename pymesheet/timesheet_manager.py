@@ -13,14 +13,12 @@ from user_interface import UserInterface
 from utilities.time_utils import Converter, TimeCalculator
 from utilities.utils import get_current_week_days, generate_day_dict
 
-VERSION = "3.0.1"
+VERSION = "3.1"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
 
 # TODO: Feature idea if a task is no longer used, can export the times to the baseline then delete it from the task list
-# TODO: Feature idea: export formatted reports (maybe csvs that are human readable) (does go against privacy principle
-# TODO: though
 def clear():
     """
     Global function that clears the command line
@@ -93,6 +91,8 @@ class TimesheetManager:
                 self.total_time()
             elif code == "35":
                 self.weekly_report()
+            elif code == '36':
+                self.export_monthly_reports()
             elif code == '41':
                 self.list_tasks()
             elif code == '43':
@@ -860,6 +860,46 @@ class TimesheetManager:
                 diff = self.workweek - hours
                 print("{} hours still need to be worked this week in order to meet workweek requirements.".format(diff))
         self.UI.user_return()
+
+    def export_monthly_reports(self):
+        """
+        Exports monthly summary reports for the current Timesheet.  Reduces times worked to 1/10 of an hour times, i.e.
+        1.3 hours, 33.7 hours.
+        """
+        self.UI.banner()
+        export = input("[WARNING] Exporting reports from the current Timesheet will allow \n"
+                       "anyone to view the data without the need for unpickling.\n\n"
+                       "Do you wish to continue? [y/n]...")
+        if export.lower() == 'y':
+            self.UI.banner()
+            print("Exporting monthly reports for Timesheet '{}'...\n".format(self.name))
+            data = self.load_timesheet(self.name, only_data=True)
+            dataT = data.transpose()
+            dataT.index = pd.to_datetime(dataT.index)
+            # Groups by current month, i.e. 2018-7-31 is all times for July
+            monthly = dataT.groupby(pd.Grouper(freq='M')).apply(sum)
+            min_monthly = monthly.apply(Converter.sec2min)
+            hours_monthly = min_monthly.apply(Converter.min2decimal_hour)
+            report = {}
+            for month in hours_monthly.index:
+                month_data = hours_monthly.loc[month]
+                clean = month_data[month_data != 0]  # remove non-worked tasks
+                report[month] = clean
+            os.makedirs("Monthly Reports", exist_ok=True)
+            for month in report:
+                month_string = month.strftime("%m-%Y")
+                print("Exporting:", month_string)
+                report[month].to_csv(pathjoin("Monthly Reports", "Report_{}_{}.csv".format(month_string, self.name)))
+            print("\nExport successful.")
+            self.UI.user_return()
+        elif export.lower() == 'n':
+            self.UI.banner()
+            print("Exporting canceled.")
+            self.UI.user_return()
+        else:
+            self.UI.banner()
+            print("[WARNING] Invalid input...not exporting.")
+            self.UI.user_return()
 
     ################ Debug Functions ################
 

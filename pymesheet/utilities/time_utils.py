@@ -24,6 +24,11 @@ class Converter:
             return hours, mins
 
     @staticmethod
+    def min2decimal_hour(mins):
+        hours = round(mins / 60, 1)
+        return hours
+
+    @staticmethod
     def hour2day(hours):
         days = hours // 24
         if days == 0:
