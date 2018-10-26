@@ -10,10 +10,10 @@ import pendulum, time, pickle, os
 from shutil import copyfile
 from os.path import join as pathjoin
 from user_interface import UserInterface
-from utils.time_utils import Converter, TimeCalculator
-from utils.utils import get_current_week_days, generate_day_dict
+from utilities.time_utils import Converter, TimeCalculator
+from utilities.utils import get_current_week_days, generate_day_dict
 
-VERSION = "2.4"
+VERSION = "2.6"
 CONFIG_PATH = ".config"
 STATE_PATH = "."
 
@@ -52,9 +52,13 @@ class TimesheetManager:
         self.name = name
         self.today = pendulum.today(tz=self.tz)
         new = False
-        try:
-            self.load_timesheet(self.name)
-        except FileNotFoundError:
+        loaded = self.load_timesheet(self.name)
+        if not loaded:
+            clear()
+            print("[SETUP] The current default Timesheet does not exist.\nA temporary Timesheet will be created.")
+            print("\nPlease change your default timesheet in the 'Timesheet Management' menu.")
+            _ = input("\nPress ENTER to continue...")
+            name = "TEMPORARY"
             new = True
             self.tasks = None
             self.data = pd.DataFrame(index=self.tasks)
@@ -68,6 +72,7 @@ class TimesheetManager:
             self.start_task_from_state(task, start)
         if ".state-{}-workday".format(name) in os.listdir(STATE_PATH):
             self.working_start, self.work_day_allocated = self.load_workday_state()
+            self.UI.working = True
 
         while True:
             code, string = self.UI.ask_generic_input()
@@ -76,7 +81,7 @@ class TimesheetManager:
                 self.start_task(string)
             elif code == '2':
                 if string == 'start':
-                    self.working_start = time.time()
+                    self.start_workday()
                 else:
                     self.add_workday()
             elif code == '31':
@@ -102,7 +107,9 @@ class TimesheetManager:
             elif code == '52':
                 self.create_new_timesheet(string)
             elif code == '53':
-                self.load_timesheet(string)
+                loaded = self.load_timesheet(string)
+                if not loaded:
+                    print("Timesheet '{}' does not exist.".format(name))
                 self.UI.user_return()
             elif code == '54':
                 self.delete_timesheet(string)
@@ -144,6 +151,7 @@ class TimesheetManager:
         """
         Loads a timesheet and sets all the parameters of this class to deal with the new timesheet
         :param name: name of Timesheet
+        :return: False if file not found error, True if loaded, or data if asking for data
         """
         if name != "":
             path = pathjoin(self.path, "{}.pkl".format(name))
@@ -163,13 +171,13 @@ class TimesheetManager:
                     if ".state-{}-workday".format(name) in os.listdir(STATE_PATH):
                         self.working_start, self.work_day_allocated = self.load_workday_state()
                 except FileNotFoundError:
-                    self.UI.banner()
-                    print("Timesheet '{}' does not exist.".format(name))
+                    return False
             else:
                 try:
                     return pickle.load(open(path, "rb"))
                 except FileNotFoundError:
-                    print("[ERROR] Internal error on loading data from TS {}.  The file was not found".format(name))
+                    return False
+        return True
 
     def delete_timesheet(self, name):
         """
@@ -182,18 +190,23 @@ class TimesheetManager:
             while decision not in ["y", "n"]:
                 decision = input("[WARNING] Confirm DELETION of Timesheet '{}' [y/n]: ".format(name)).lower()
             if decision == "y":
-                if name == self.name:
-                    print("[WARNING] Deleting current Timesheet, new current Timesheet will be the default.")
-                    _ = input("\nPress ENTER to continue...")
-                    try:
-                        self.load_timesheet(self.load_config()[0])
-                    except FileNotFoundError:
-                        print("[WARNING] No default Timesheet set, creating a temporary...")
-                        _ = input("\nPress ENTER to acknowledge...")
-                        self.create_new_timesheet("TEMPORARY")
-                os.remove(pathjoin(self.path, name + ".pkl"))
-                print("'{}' deleted.".format(name))
-                self.UI.user_return()
+                if "{}.pkl".format(name) in os.listdir(self.path):
+                    if name == self.name:
+                        os.remove(pathjoin(self.path, name + ".pkl"))
+                        print("[WARNING] Deleting current Timesheet, new current Timesheet will be the default.")
+                        _ = input("\nPress ENTER to continue...")
+                        loaded = self.load_timesheet(self.load_config()[0])
+                        if not loaded:
+                            self.UI.banner()
+                            print("[WARNING] No default Timesheet set, creating a temporary...")
+                            _ = input("\nPress ENTER to acknowledge...")
+                            self.create_new_timesheet("TEMPORARY")
+                    self.UI.banner()
+                    print("'{}' deleted.".format(name))
+                    self.UI.user_return()
+                else:
+                    print("There exists no Timesheet with the name '{}'.".format(name))
+                    self.UI.user_return()
             else:
                 print("'{}' not deleted.".format(name))
                 self.UI.user_return()
@@ -220,14 +233,17 @@ class TimesheetManager:
         path = pathjoin(self.path, ".backup")
         os.makedirs(path, exist_ok=True)
         data = self.load_timesheet(name, only_data=True)
-        self.save_timesheet(path, name, data)
+        if not data:
+            print("Timesheet '{}' does not exist.".format(name))
+        else:
+            self.save_timesheet(path, name, data)
 
-        if "{}-config.data".format(self.name) in os.listdir(CONFIG_PATH):
-            os.makedirs(pathjoin(path, ".config"), exist_ok=True)
-            copyfile(pathjoin(CONFIG_PATH, "{}-config.data".format(self.name)),
-                     pathjoin(path, ".config", "{}-config.data".format(self.name)))
+            if "{}-config.data".format(self.name) in os.listdir(CONFIG_PATH):
+                os.makedirs(pathjoin(path, ".config"), exist_ok=True)
+                copyfile(pathjoin(CONFIG_PATH, "{}-config.data".format(self.name)),
+                         pathjoin(path, ".config", "{}-config.data".format(self.name)))
 
-        print("'{}' successfully backed up.".format(name))
+            print("'{}' successfully backed up.".format(name))
         self.UI.user_return()
 
     def create_new_timesheet(self, name):
@@ -302,8 +318,8 @@ class TimesheetManager:
         """
         with open(pathjoin(STATE_PATH, ".state-{}-workday".format(self.name)), "r") as state:
             old = state.read().split("=")
-            workday = old[0]
-            allocated = old[1]
+            workday = float(old[0])
+            allocated = float(old[1])
         return workday, allocated
 
     def load_state(self):
@@ -314,7 +330,7 @@ class TimesheetManager:
         with open(pathjoin(STATE_PATH, ".state-{}".format(self.name)), "r") as state:
             old = state.read().split("=")
             task = old[0]
-            start = old[1]
+            start = float(old[1])
         return task, start
 
     def delete_state(self):
@@ -322,6 +338,12 @@ class TimesheetManager:
         Deletes the state file
         """
         os.remove(pathjoin(STATE_PATH, ".state-{}".format(self.name)))
+
+    def delete_workday_state(self):
+        """
+        Deletes the workday state file
+        """
+        os.remove(pathjoin(STATE_PATH, ".state-{}-workday".format(self.name)))
 
     ################ Configuration Functions ################
 
@@ -487,7 +509,6 @@ class TimesheetManager:
         """
         if self.today.to_date_string() not in self.data.columns:
             self.data[self.today.to_date_string()] = 0
-        start = float(start)
         self.UI.timelogger(task_name, start)
         self._end_task(task_name, start)
 
@@ -507,8 +528,16 @@ class TimesheetManager:
         if self.working_start:
             if name != "General":
                 self.work_day_allocated += time_worked
+                self.create_workday_state()
         self.UI.user_return()
         self.UI.banner()
+
+    def start_workday(self):
+        """
+        Starts recording all time until deactivated.
+        """
+        self.working_start = time.time()
+        self.create_workday_state()
 
     def add_workday(self):
         """
@@ -524,6 +553,7 @@ class TimesheetManager:
         workday = work_time - self.work_day_allocated
         self.work_day_allocated = 0
         self.working_start = None
+        self.delete_workday_state()
         if workday < 0:
             print("[ERROR] Workday length was negative time.  Did you start your workday properly?")
             print("[DEBUG] workday={}, worktime={}".format(workday, work_time))
@@ -534,7 +564,7 @@ class TimesheetManager:
             work_time_mins = Converter.sec2min(work_time)
             work_time_hours, work_time_mins = Converter.min2hour(work_time_mins)
             work_hour_min_string = Converter.convert2string(int(work_time_hours), int(work_time_mins))
-            mins = Converter.sec2min(work_time)
+            mins = Converter.sec2min(workday)
             hours, mins = Converter.min2hour(mins)
             hour_min_string = Converter.convert2string(int(hours), int(mins))
             print("Total hours accumulated during the this work day: {}".format(work_hour_min_string))

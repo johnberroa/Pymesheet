@@ -36,7 +36,7 @@ class UserInterface:
 
     def summary_divider(self, text):
         """
-        Prints a row of --- for a divider
+        Prints a row of --- for a divider with specified length
         """
         print("-" * len(text))
 
